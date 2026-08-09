@@ -54,6 +54,16 @@ export default function AdminGuestsPage() {
 
   useEffect(() => { fetchGuests(); }, [fetchGuests]);
 
+  // Debounce the search box → live search (same UX as Manage Bookings), so the
+  // list filters as you type without needing to submit.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
   const openDetail = async (id) => {
     setDetailGuest({ _loading: true });
     setDetailLoading(true);
@@ -68,12 +78,6 @@ export default function AdminGuestsPage() {
     }
   };
 
-  const doSearch = (e) => {
-    e.preventDefault();
-    setSearch(searchInput);
-    setPage(1);
-  };
-
   if (loading || !user) return null;
 
   return (
@@ -84,8 +88,8 @@ export default function AdminGuestsPage() {
         <span className="text-gray-400 text-sm">({total} total guests)</span>
       </div>
 
-      {/* Search */}
-      <form onSubmit={doSearch} className="flex gap-2 mb-6">
+      {/* Search — filters live as you type */}
+      <div className="flex gap-2 mb-6">
         <input
           type="text"
           placeholder="Search by name, email or phone…"
@@ -93,13 +97,12 @@ export default function AdminGuestsPage() {
           onChange={(e) => setSearchInput(e.target.value)}
           className="input flex-1 max-w-sm"
         />
-        <button type="submit" className="btn-secondary">Search</button>
-        {search && (
-          <button type="button" onClick={() => { setSearch(''); setSearchInput(''); setPage(1); }} className="btn-secondary text-gray-500">
+        {searchInput && (
+          <button type="button" onClick={() => setSearchInput('')} className="btn-secondary text-gray-500">
             Clear
           </button>
         )}
-      </form>
+      </div>
 
       {loadingData ? (
         <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="h-14 bg-gray-100 animate-pulse rounded-xl" />)}</div>
@@ -234,7 +237,14 @@ export default function AdminGuestsPage() {
 
             <div className="flex gap-2 pt-2">
               <Link
-                href={`/admin/offline-booking`}
+                href={{
+                  pathname: '/admin/offline-booking',
+                  query: {
+                    guestName: detailGuest.guest?.name || '',
+                    guestPhone: detailGuest.guest?.phone || '',
+                    guestEmail: detailGuest.guest?.email || '',
+                  },
+                }}
                 className="btn-primary flex-1 text-center text-sm"
                 onClick={() => setDetailGuest(null)}
               >

@@ -4,15 +4,7 @@ import Link from 'next/link';
 import BookingWidget from '@/components/booking/BookingWidget';
 import MobileBookingBar from '@/components/booking/MobileBookingBar';
 import RoomImageSlideshow from '@/components/rooms/RoomImageSlideshow';
-
-
-
-const amenityIcons = {
-  'Free WiFi': '📶', 'Rooftop Pool': '🏊', 'Spa & Wellness': '💆', 'Fine Dining': '🍽️',
-  'Fitness Center': '🏋️', 'Business Center': '💼', 'Balcony': '🌅', 'King Bed': '🛏️',
-  'Jacuzzi': '🛁', 'Butler Service': '🤵', 'AC': '❄️', 'Smart TV': '📺',
-  'Mini Bar': '🍾', 'Ocean View': '🌊', 'City View': '🏙️', 'Garden View': '🌿',
-};
+import { amenityIcon } from '@/lib/amenities';
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
@@ -122,7 +114,7 @@ export default async function RoomDetailPage({ params }) {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {roomType.amenities.map((a) => (
                     <div key={a} className="flex items-center gap-2 text-sm text-gray-700">
-                      <span className="text-lg">{amenityIcons[a] || '✓'}</span>
+                      <span className="text-lg">{amenityIcon(a)}</span>
                       <span>{a}</span>
                     </div>
                   ))}

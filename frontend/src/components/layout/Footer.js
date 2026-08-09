@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useTenant } from '@/context/TenantContext';
+import { amenityIcon } from '@/lib/amenities';
 
 export default function Footer() {
   const { hotel } = useTenant() || {};
@@ -22,7 +23,6 @@ export default function Footer() {
         <div>
           <h4 className="text-white font-medium mb-3">Explore</h4>
           <ul className="space-y-2 text-sm">
-            <li><Link href="/hotels" className="hover:text-white transition-colors">All Hotels</Link></li>
             <li><Link href="/hotel/book" className="hover:text-white transition-colors">Rooms &amp; Booking</Link></li>
             <li><Link href="/auth/register" className="hover:text-white transition-colors">Create Account</Link></li>
             <li><Link href="/auth/login" className="hover:text-white transition-colors">Sign In</Link></li>
@@ -38,14 +38,15 @@ export default function Footer() {
         </div>
         <div>
           <h4 className="text-white font-medium mb-3">Hotel Amenities</h4>
-          <ul className="space-y-2 text-sm text-gray-400">
-            <li>🏊 Rooftop Pool</li>
-            <li>💆 Spa & Wellness</li>
-            <li>🍽️ Fine Dining</li>
-            <li>🏋️ Fitness Center</li>
-            <li>💼 Business Center</li>
-            <li>✈️ Airport Transfer</li>
-          </ul>
+          {hotel?.amenities?.length > 0 ? (
+            <ul className="space-y-2 text-sm text-gray-400">
+              {hotel.amenities.slice(0, 6).map((a) => (
+                <li key={a}>{amenityIcon(a)} {a}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-gray-500 italic">No amenities configured yet.</p>
+          )}
         </div>
       </div>
       <div className="border-t border-gray-800 py-4 text-center text-xs text-gray-500">

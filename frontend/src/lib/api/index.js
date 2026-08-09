@@ -18,12 +18,8 @@ export const authApi = {
 
 // ── Hotels ────────────────────────────────────────────────────────────────────
 export const hotelsApi = {
-  list: (params) => executeApi.get('/hotels', { params }),
-  getBySlug: (slug) => executeApi.get(`/hotels/${slug}`),
   getById: (id) => executeApi.get(`/hotels/id/${id}`),
   getFeatured: (limit = 6) => executeApi.get('/hotels/featured', { params: { limit } }),
-  search: (q, limit = 10) => executeApi.get('/hotels/search', { params: { q, limit } }),
-  getPopularCities: () => executeApi.get('/hotels/cities'),
 };
 
 // ── Rooms ─────────────────────────────────────────────────────────────────────

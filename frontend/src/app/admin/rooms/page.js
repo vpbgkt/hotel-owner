@@ -8,6 +8,7 @@ import { useForm } from 'react-hook-form';
 import { formatCurrency } from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
 import toast from 'react-hot-toast';
+import { ROOM_AMENITY_OPTIONS } from '@/lib/amenities';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:4000';
 
@@ -94,6 +95,57 @@ function ImageManager({ images, onChange }) {
   );
 }
 
+function AmenityManager({ amenities, options, onChange }) {
+  const [newAmenity, setNewAmenity] = useState('');
+
+  const toggle = (a) =>
+    onChange(amenities.includes(a) ? amenities.filter((x) => x !== a) : [...amenities, a]);
+
+  const addCustom = () => {
+    const name = newAmenity.trim();
+    if (!name) return;
+    if (amenities.some((a) => a.toLowerCase() === name.toLowerCase())) {
+      toast.error('Amenity already added');
+      return;
+    }
+    onChange([...amenities, name]);
+    setNewAmenity('');
+  };
+
+  // Merge default options with any already-selected custom ones so they stay visible.
+  const allOptions = [...options, ...amenities.filter((a) => !options.includes(a))];
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <label className="label mb-0">Room Amenities</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={newAmenity}
+            onChange={(e) => setNewAmenity(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }}
+            placeholder="e.g. Sea View"
+            className="input text-sm py-1.5 w-36"
+          />
+          <button type="button" onClick={addCustom} className="text-xs px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 whitespace-nowrap">
+            + Add amenities option
+          </button>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {allOptions.map((a) => (
+          <label key={a} className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50 has-[:checked]:bg-primary-50 transition">
+            <input type="checkbox" checked={amenities.includes(a)} onChange={() => toggle(a)} />
+            <span className="text-sm">{a}</span>
+          </label>
+        ))}
+      </div>
+      <p className="text-xs text-gray-400">{amenities.length} selected</p>
+    </div>
+  );
+}
+
 export default function AdminRoomsPage() {
   const { user, loading, isAuthenticated } = useAuth();
   const router = useRouter();
@@ -102,6 +154,7 @@ export default function AdminRoomsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [images, setImages] = useState([]);
+  const [amenities, setAmenities] = useState([]);
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm();
 
@@ -122,6 +175,7 @@ export default function AdminRoomsPage() {
   const openCreate = () => {
     setEditing(null);
     setImages([]);
+    setAmenities([]);
     reset({});
     setModalOpen(true);
   };
@@ -129,6 +183,7 @@ export default function AdminRoomsPage() {
   const openEdit = (rt) => {
     setEditing(rt);
     setImages(rt.images || []);
+    setAmenities(rt.amenities || []);
     reset({
       name: rt.name,
       description: rt.description,
@@ -142,7 +197,7 @@ export default function AdminRoomsPage() {
   };
 
   const onSubmit = async (data) => {
-    const payload = { ...data, images: images.filter(Boolean) };
+    const payload = { ...data, images: images.filter(Boolean), amenities };
     try {
       if (editing) {
         await adminApi.updateRoomType(editing.id, payload);
@@ -245,6 +300,11 @@ export default function AdminRoomsPage() {
               <label className="label">Max Children</label>
               <input type="number" className="input" {...register('maxChildren', { required: true, min: 0, valueAsNumber: true })} />
             </div>
+          </div>
+
+          {/* Amenity Manager */}
+          <div className="border-t pt-4">
+            <AmenityManager amenities={amenities} options={ROOM_AMENITY_OPTIONS} onChange={setAmenities} />
           </div>
 
           {/* Image Manager */}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { adminApi, analyticsApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
@@ -31,13 +31,29 @@ export default function AdminDashboardPage() {
     }
   }, [user, loading, router]);
 
-  useEffect(() => {
+  const fetchStats = useCallback(() => {
     if (user?.role !== 'HOTEL_ADMIN') return;
     adminApi.getDashboard()
       .then((res) => setStats(res.data.data))
       .catch(() => {})
       .finally(() => setLoadingStats(false));
   }, [user]);
+
+  useEffect(() => { fetchStats(); }, [fetchStats]);
+
+  // Refresh stats when the admin returns to this tab/window so a booking
+  // created elsewhere (e.g. the walk-in page) is reflected without a hard reload.
+  useEffect(() => {
+    if (user?.role !== 'HOTEL_ADMIN') return;
+    const onFocus = () => fetchStats();
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchStats(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [fetchStats, user]);
 
   if (loading || !user) return null;
 
@@ -103,7 +119,7 @@ export default function AdminDashboardPage() {
                   {(stats.recentBookings || []).map((b) => (
                     <tr key={b.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-mono text-xs">{b.bookingNumber}</td>
-                      <td className="px-4 py-3">{b.guest?.name || b.guestName}</td>
+                      <td className="px-4 py-3">{b.guestName || b.guest?.name}</td>
                       <td className="px-4 py-3">{b.roomType?.name || '—'}</td>
                       <td className="px-4 py-3 text-gray-500">
                         {b.checkInDate ? `${dayjs(b.checkInDate).format('DD MMM')} – ${dayjs(b.checkOutDate).format('DD MMM')}` : '—'}

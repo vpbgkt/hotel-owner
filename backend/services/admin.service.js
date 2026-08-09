@@ -269,13 +269,31 @@ class AdminService {
     const {
       roomTypeId, bookingType = 'DAILY',
       checkInDate, checkOutDate, checkInTime, checkOutTime, numHours,
-      numRooms = 1, numGuests = 1, numExtraGuests = 0,
+      numRooms = 1, numExtraGuests = 0,
       guestName, guestEmail, guestPhone,
       paymentMethod = 'CASH', notes,
     } = data;
 
+    // Guests are captured as adults + children, mirroring the guest-facing
+    // booking flow (booking.service.js). Fall back to legacy numGuests if the
+    // client only sent a single guest count.
+    const numAdults = parseInt(data.numAdults ?? data.numGuests ?? 1);
+    const numChildren = parseInt(data.numChildren ?? 0);
+    const numGuests = numAdults + numChildren;
+
     const roomType = await RoomType.findOne({ where: { id: roomTypeId, hotelId } });
     if (!roomType) throw createError('Room type not found', 404);
+
+    // Enforce the same occupancy limits as the online booking flow, scaled by
+    // number of rooms booked.
+    const maxAdults = (roomType.maxAdults ?? roomType.maxGuests) * numRooms;
+    const maxChildren = (roomType.maxChildren ?? 0) * numRooms;
+    const maxOccupancy = roomType.maxGuests * numRooms;
+
+    if (numAdults < 1) throw createError('At least 1 adult is required', 400);
+    if (numAdults > maxAdults) throw createError(`Max ${maxAdults} adult(s) allowed for ${numRooms} room(s) of this type`, 400);
+    if (numChildren > maxChildren) throw createError(`Max ${maxChildren} child(ren) allowed for ${numRooms} room(s) of this type`, 400);
+    if (numGuests > maxOccupancy) throw createError(`Max occupancy is ${maxOccupancy} guest(s) for ${numRooms} room(s) of this type`, 400);
 
     const hotel = await Hotel.findByPk(hotelId, { attributes: ['id', 'gstRate'] });
     const taxRate = hotel?.gstRate ?? 0.12;
@@ -333,6 +351,8 @@ class AdminService {
       numHours: bookingType === 'HOURLY' ? hours : null,
       numRooms,
       numGuests,
+      numAdults,
+      numChildren,
       numExtraGuests,
       guestName,
       guestEmail,
@@ -364,11 +384,14 @@ class AdminService {
     const guestIds = guestIdRows.map((r) => r.guestId).filter(Boolean);
 
     const userWhere = { id: { [Op.in]: guestIds }, role: 'GUEST' };
-    if (search) {
+    if (search && search.trim()) {
+      // Op.like (not iLike) so it works on both SQLite (dev — LIKE is
+      // case-insensitive for ASCII) and Postgres, consistent with listBookings.
+      const likeTerm = `%${search.trim()}%`;
       userWhere[Op.or] = [
-        { name: { [Op.iLike]: `%${search}%` } },
-        { email: { [Op.iLike]: `%${search}%` } },
-        { phone: { [Op.iLike]: `%${search}%` } },
+        { name: { [Op.like]: likeTerm } },
+        { email: { [Op.like]: likeTerm } },
+        { phone: { [Op.like]: likeTerm } },
       ];
     }
 

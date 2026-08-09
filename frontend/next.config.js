@@ -27,6 +27,19 @@ const nextConfig = {
   turbopack: {
     root: __dirname,
   },
+  // Shorten the App Router client-side segment cache so navigating back to a
+  // page (e.g. returning to /admin after creating a walk-in booking) re-renders
+  // and re-runs client data fetches instead of showing a stale cached version.
+  // Without this, static routes are cached for 5 minutes by default.
+  // Note: Next.js enforces a minimum of 30s for staleTimes.static (0 is
+  // rejected), so pages relying on always-fresh data also call router.refresh()
+  // after mutations rather than depending solely on this setting.
+  experimental: {
+    staleTimes: {
+      dynamic: 0,
+      static: 30,
+    },
+  },
 };
 
 module.exports = nextConfig;

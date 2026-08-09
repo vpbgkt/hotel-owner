@@ -24,17 +24,16 @@ export default function OfflineBookingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [preview, setPreview] = useState(null);
   const [bookingType, setBookingType] = useState('DAILY');
-  const [lastBooking, setLastBooking] = useState(null);
   const [availability, setAvailability] = useState(null);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [gstRate, setGstRate] = useState(DEFAULT_TAX_RATE);
 
-  const { register, handleSubmit, watch, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm({
     defaultValues: {
       bookingType: 'DAILY',
       numRooms: 1,
-      numGuests: 1,
-      numExtraGuests: 0,
+      numAdults: 1,
+      numChildren: 0,
       paymentMethod: 'CASH',
       checkInDate: dayjs().format('YYYY-MM-DD'),
       checkOutDate: dayjs().add(1, 'day').format('YYYY-MM-DD'),
@@ -48,8 +47,16 @@ export default function OfflineBookingPage() {
   const checkInDate = watch('checkInDate');
   const checkOutDate = watch('checkOutDate');
   const numRooms = watch('numRooms');
-  const numExtraGuests = watch('numExtraGuests');
+  const numAdults = watch('numAdults');
+  const numChildren = watch('numChildren');
   const numHours = watch('numHours');
+
+  const selectedRT = roomTypes.find((r) => String(r.id) === String(roomTypeId));
+  const maxAdults = (selectedRT?.maxAdults ?? selectedRT?.maxGuests ?? 10) * (parseInt(numRooms) || 1);
+  const maxChildren = (selectedRT?.maxChildren ?? 0) * (parseInt(numRooms) || 1);
+  const maxOccupancy = (selectedRT?.maxGuests ?? 10) * (parseInt(numRooms) || 1);
+  const totalGuests = (parseInt(numAdults) || 0) + (parseInt(numChildren) || 0);
+  const occupancyError = !!selectedRT && totalGuests > maxOccupancy;
 
   useEffect(() => {
     if (!loading && (!isAuthenticated || !['HOTEL_ADMIN', 'HOTEL_STAFF'].includes(user?.role))) {
@@ -64,6 +71,20 @@ export default function OfflineBookingPage() {
       .catch(() => {})
       .finally(() => setLoadingRooms(false));
   }, [isAuthenticated]);
+
+  // Prefill guest details when arriving from "New Booking for Guest" on the
+  // Guests page (passed as ?guestName=&guestPhone=&guestEmail= query params).
+  // Read from window.location to avoid a useSearchParams Suspense boundary.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const gName = params.get('guestName');
+    const gPhone = params.get('guestPhone');
+    const gEmail = params.get('guestEmail');
+    if (gName) setValue('guestName', gName);
+    if (gPhone) setValue('guestPhone', gPhone);
+    if (gEmail) setValue('guestEmail', gEmail);
+  }, [setValue]);
 
   // Load the hotel's actual GST rate so the price preview matches what the
   // backend will charge (previously hardcoded to 12% here, ignoring whatever
@@ -101,13 +122,12 @@ export default function OfflineBookingPage() {
       subtotal = (rt.basePriceHourly || rt.basePriceDaily / 12) * hours * (parseInt(numRooms) || 1);
     }
 
-    const extraCharge = (rt.extraGuestCharge || 0) * (parseInt(numExtraGuests) || 0) * (bookingType === 'DAILY' ? nights : hours);
     const taxRate = gstRate ?? DEFAULT_TAX_RATE;
-    const taxAmount = Math.round((subtotal + extraCharge) * taxRate);
-    const total = subtotal + extraCharge + taxAmount;
+    const taxAmount = Math.round(subtotal * taxRate);
+    const total = subtotal + taxAmount;
 
-    setPreview({ subtotal, extraCharge, taxAmount, total, nights, hours, rtName: rt.name, taxRate });
-  }, [roomTypeId, checkInDate, checkOutDate, numRooms, numExtraGuests, numHours, bookingType, roomTypes, gstRate]);
+    setPreview({ subtotal, taxAmount, total, nights, hours, rtName: rt.name, taxRate });
+  }, [roomTypeId, checkInDate, checkOutDate, numRooms, numHours, bookingType, roomTypes, gstRate]);
 
   // Live "rooms available" check for daily bookings, so staff can see current
   // stock for the selected room type + dates before confirming a walk-in.
@@ -136,23 +156,27 @@ export default function OfflineBookingPage() {
       toast.error('Not enough rooms available for the selected dates');
       return;
     }
+    if (occupancyError) {
+      toast.error(`Total guests (${totalGuests}) exceed max occupancy of ${maxOccupancy}`);
+      return;
+    }
     setSubmitting(true);
     try {
-      const res = await adminApi.createOfflineBooking({ ...data, bookingType });
-      const booking = res.data.data;
-      setLastBooking(booking);
-      toast.success(`Booking ${booking.bookingNumber} created!`);
-      reset({
-        bookingType: 'DAILY',
-        numRooms: 1,
-        numGuests: 1,
-        numExtraGuests: 0,
-        paymentMethod: 'CASH',
-        checkInDate: dayjs().format('YYYY-MM-DD'),
-        checkOutDate: dayjs().add(1, 'day').format('YYYY-MM-DD'),
+      const adults = parseInt(data.numAdults) || 1;
+      const children = parseInt(data.numChildren) || 0;
+      const res = await adminApi.createOfflineBooking({
+        ...data,
+        bookingType,
+        numAdults: adults,
+        numChildren: children,
+        numGuests: adults + children,
       });
-      setPreview(null);
-      setAvailability(null);
+      const booking = res.data.data;
+      toast.success(`Booking ${booking.bookingNumber} created!`);
+      // Invalidate the App Router client cache so the bookings list reflects the
+      // new booking, then send the user to Manage Bookings to see it.
+      router.refresh();
+      router.push('/admin/bookings');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create booking');
     } finally {
@@ -169,19 +193,6 @@ export default function OfflineBookingPage() {
         <h1 className="text-2xl font-bold text-gray-900">Walk-in / Counter Booking</h1>
         <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full font-medium">Offline</span>
       </div>
-
-      {/* Last booking confirmation */}
-      {lastBooking && (
-        <div className="mb-6 bg-green-50 border border-green-200 rounded-xl p-4 flex items-start justify-between gap-4">
-          <div>
-            <p className="font-semibold text-green-800">✅ Booking confirmed: <span className="font-mono">{lastBooking.bookingNumber}</span></p>
-            <p className="text-green-700 text-sm mt-0.5">
-              {lastBooking.guestName} · {formatCurrency(lastBooking.totalAmount)} · Status: {lastBooking.status}
-            </p>
-          </div>
-          <Link href="/admin/bookings" className="text-sm text-green-700 underline whitespace-nowrap">View All</Link>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Form */}
@@ -284,14 +295,21 @@ export default function OfflineBookingPage() {
                   <input type="number" min="1" className="input" {...register('numRooms', { min: 1 })} />
                 </div>
                 <div>
-                  <label className="label">Guests</label>
-                  <input type="number" min="1" className="input" {...register('numGuests', { min: 1 })} />
+                  <label className="label">Adults <span className="text-gray-400 text-xs">(max {maxAdults})</span></label>
+                  <input type="number" min="1" max={maxAdults} className="input"
+                    {...register('numAdults', { min: 1, max: maxAdults, required: true, valueAsNumber: true })} />
+                  {errors.numAdults && <p className="error-message">1–{maxAdults} adults allowed</p>}
                 </div>
                 <div>
-                  <label className="label">Extra Guests</label>
-                  <input type="number" min="0" className="input" {...register('numExtraGuests', { min: 0 })} />
+                  <label className="label">Children <span className="text-gray-400 text-xs">(max {maxChildren})</span></label>
+                  <input type="number" min="0" max={maxChildren} className="input"
+                    {...register('numChildren', { min: 0, max: maxChildren, valueAsNumber: true })} />
+                  {errors.numChildren && <p className="error-message">Max {maxChildren} children allowed</p>}
                 </div>
               </div>
+              {occupancyError && (
+                <p className="text-red-500 text-xs">Total guests ({totalGuests}) exceed max occupancy of {maxOccupancy}.</p>
+              )}
             </div>
 
             {/* Guest Info */}
@@ -333,7 +351,7 @@ export default function OfflineBookingPage() {
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || occupancyError}
               className="w-full btn-primary py-4 text-base font-semibold"
             >
               {submitting ? 'Creating Booking…' : '✅ Confirm Walk-in Booking'}
@@ -357,12 +375,6 @@ export default function OfflineBookingPage() {
                   <span className="text-gray-500">Room charges</span>
                   <span>{formatCurrency(preview.subtotal)}</span>
                 </div>
-                {preview.extraCharge > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Extra guest charge</span>
-                    <span>{formatCurrency(preview.extraCharge)}</span>
-                  </div>
-                )}
                 <div className="flex justify-between">
                   <span className="text-gray-500">GST ({Math.round((preview.taxRate ?? DEFAULT_TAX_RATE) * 100)}%)</span>
                   <span>{formatCurrency(preview.taxAmount)}</span>

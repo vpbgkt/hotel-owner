@@ -32,13 +32,7 @@ async function apiFetch(path, options = {}) {
 
 // ── Hotels ────────────────────────────────────────────────────────────────────
 export const serverHotelsApi = {
-  list: (params = {}) => {
-    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined))).toString();
-    return apiFetch(`/hotels${qs ? `?${qs}` : ''}`);
-  },
-  getBySlug: (slug) => apiFetch(`/hotels/${slug}`),
   getFeatured: (limit = 6) => apiFetch(`/hotels/featured?limit=${limit}`),
-  getPopularCities: () => apiFetch('/hotels/cities'),
 };
 
 // ── Blog ──────────────────────────────────────────────────────────────────────

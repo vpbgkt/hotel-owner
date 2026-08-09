@@ -30,8 +30,11 @@ class AnalyticsService {
       if (b.status === 'CANCELLED') byMonth[key].cancelledBookings += 1;
     }
 
+    // Sort descending so the newest month appears first, matching the rest of
+    // the admin UI (recent bookings, etc. are always newest-first).
     return Object.keys(byMonth)
       .sort()
+      .reverse()
       .map((month) => ({ month, ...byMonth[month] }));
   }
 
@@ -67,12 +70,21 @@ class AnalyticsService {
       raw: true,
     });
 
+    // Total bookings for the period regardless of payment status — distinct
+    // from paidBookings below, which only counts the PAID subset used for the
+    // revenue aggregate. Reported separately so the UI isn't misled into
+    // showing "Total Bookings" when only paid bookings were actually counted.
+    const totalBookingsAllStatuses = await Booking.count({
+      where: { hotelId, createdAt: { [Op.between]: [start, end] } },
+    });
+
     return {
       period: { startDate: start, endDate: end },
       totalRevenue: parseFloat(result[0]?.totalRevenue || 0),
       roomRevenue: parseFloat(result[0]?.roomRevenue || 0),
       totalTaxes: parseFloat(result[0]?.totalTaxes || 0),
-      totalBookings: parseInt(result[0]?.totalBookings || 0, 10),
+      totalBookings: totalBookingsAllStatuses,
+      paidBookings: parseInt(result[0]?.totalBookings || 0, 10),
       avgBookingValue: parseFloat(parseFloat(result[0]?.avgBookingValue || 0).toFixed(2)),
       totalRefunds: parseFloat(refundResult[0]?.totalRefunds || 0),
     };

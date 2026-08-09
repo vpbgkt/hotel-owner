@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import { HOTEL_AMENITY_OPTIONS } from '@/lib/amenities';
 
 const HOTEL_ID = '11111111-1111-1111-1111-111111111111';
 const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:4000';
@@ -57,12 +58,6 @@ function ImageUploadField({ label, value, onChange, hint }) {
   );
 }
 
-const AMENITY_OPTIONS = [
-  'Free WiFi', 'Rooftop Pool', 'Spa & Wellness', 'Fine Dining', 'Fitness Center',
-  'Business Center', 'Conference Rooms', 'Valet Parking', 'Airport Transfer',
-  '24h Room Service', 'Bar & Lounge', 'Kids Play Area', 'Laundry Service', 'Concierge',
-];
-
 export default function AdminSettingsPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -72,6 +67,8 @@ export default function AdminSettingsPage() {
   const [logoUrl, setLogoUrl] = useState('');
   const [heroImages, setHeroImages] = useState([]);
   const [selectedAmenities, setSelectedAmenities] = useState([]);
+  const [amenityOptions, setAmenityOptions] = useState(HOTEL_AMENITY_OPTIONS);
+  const [newAmenity, setNewAmenity] = useState('');
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
@@ -87,7 +84,14 @@ export default function AdminSettingsPage() {
         setCoverImageUrl(h.coverImageUrl || '');
         setLogoUrl(h.logoUrl || '');
         setHeroImages(h.heroImages || []);
-        setSelectedAmenities(h.amenities || []);
+        const savedAmenities = h.amenities || [];
+        setSelectedAmenities(savedAmenities);
+        // Make sure any custom amenities already saved on the hotel (but not
+        // part of the default list) still show up as an option in the grid.
+        setAmenityOptions((prev) => {
+          const extra = savedAmenities.filter((a) => !prev.includes(a));
+          return extra.length ? [...prev, ...extra] : prev;
+        });
         reset({
           gstRate: ((h.gstRate ?? 0.12) * 100).toFixed(0),
           checkInTime: h.checkInTime || '14:00',
@@ -124,6 +128,19 @@ export default function AdminSettingsPage() {
 
   const toggleAmenity = (a) =>
     setSelectedAmenities((prev) => prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]);
+
+  const addAmenity = () => {
+    const name = newAmenity.trim();
+    if (!name) return;
+    const exists = amenityOptions.some((a) => a.toLowerCase() === name.toLowerCase());
+    if (exists) {
+      toast.error('This amenity already exists');
+      return;
+    }
+    setAmenityOptions((prev) => [...prev, name]);
+    setSelectedAmenities((prev) => [...prev, name]);
+    setNewAmenity('');
+  };
 
   if (loading || !user) return null;
 
@@ -215,10 +232,25 @@ export default function AdminSettingsPage() {
 
         {activeTab === 'amenities' && (
           <div className="card p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">Hotel Amenities</h2>
+            <div className="flex items-center justify-between mb-1 gap-3 flex-wrap">
+              <h2 className="text-lg font-semibold text-gray-900">Hotel Amenities</h2>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newAmenity}
+                  onChange={(e) => setNewAmenity(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addAmenity(); } }}
+                  placeholder="e.g. Pet Friendly"
+                  className="input text-sm py-1.5 w-44"
+                />
+                <button type="button" onClick={addAmenity} className="text-xs px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 whitespace-nowrap">
+                  + Add amenities option
+                </button>
+              </div>
+            </div>
             <p className="text-sm text-gray-500 mb-4">Selected amenities display on the hotel page and in search results.</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {AMENITY_OPTIONS.map((a) => (
+              {amenityOptions.map((a) => (
                 <label key={a} className="flex items-center gap-2 cursor-pointer p-2.5 rounded-lg hover:bg-gray-50 has-[:checked]:bg-primary-50 transition">
                   <input type="checkbox" checked={selectedAmenities.includes(a)} onChange={() => toggleAmenity(a)} />
                   <span className="text-sm">{a}</span>
