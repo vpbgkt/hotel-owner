@@ -6,9 +6,10 @@ import { adminApi, roomsApi, hotelsApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { formatCurrency } from '@/lib/utils';
-import Link from 'next/link';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
+import { CheckCircle2, XCircle } from 'lucide-react';
 
 const PAYMENT_METHODS = ['CASH', 'UPI', 'CARD', 'BANK_TRANSFER', 'OTHER'];
 // Same fallback used by the backend (booking.service.js / room.service.js /
@@ -187,19 +188,20 @@ export default function OfflineBookingPage() {
   if (loading || !user) return null;
 
   return (
-    <main className="max-w-5xl mx-auto px-4 py-8">
-      <div className="flex items-center gap-4 mb-6">
-        <Link href="/admin" className="text-gray-400 hover:text-gray-600">← Admin</Link>
-        <h1 className="text-2xl font-bold text-gray-900">Walk-in / Counter Booking</h1>
-        <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full font-medium">Offline</span>
-      </div>
+    <main className="min-h-[80vh] bg-gray-50/50">
+      <AdminPageHeader
+        title="Walk-in / Counter Booking"
+        description="Create a booking directly for a guest at the front desk"
+        actions={<span className="bg-orange-50 text-orange-700 text-xs px-3 py-1 rounded-full font-medium">Offline</span>}
+      />
 
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Form */}
         <div className="lg:col-span-2">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* Booking Type Toggle */}
-            <div className="card p-5">
+            <div className="rounded-2xl border border-gray-100 bg-white p-5">
               <h2 className="font-semibold text-gray-900 mb-3">Booking Type</h2>
               <div className="flex gap-2">
                 {['DAILY', 'HOURLY'].map((bt) => (
@@ -213,14 +215,14 @@ export default function OfflineBookingPage() {
                         : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                     }`}
                   >
-                    {bt === 'DAILY' ? '🌙 Daily Booking' : '⏰ Hourly Booking'}
+                    {bt === 'DAILY' ? 'Daily Booking' : 'Hourly Booking'}
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Room & Dates */}
-            <div className="card p-5 space-y-4">
+            <div className="rounded-2xl border border-gray-100 bg-white p-5 space-y-4">
               <h2 className="font-semibold text-gray-900">Room & Dates</h2>
               <div>
                 <label className="label">Room Type *</label>
@@ -241,7 +243,7 @@ export default function OfflineBookingPage() {
               </div>
 
               {bookingType === 'DAILY' && roomTypeId && (
-                <div className={`text-sm px-3 py-2 rounded-lg border ${
+                <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg border ${
                   checkingAvailability ? 'bg-gray-50 border-gray-200 text-gray-500'
                   : availability?.isAvailable ? 'bg-green-50 border-green-200 text-green-700'
                   : availability ? 'bg-red-50 border-red-200 text-red-700'
@@ -250,11 +252,13 @@ export default function OfflineBookingPage() {
                   {checkingAvailability ? (
                     'Checking availability…'
                   ) : availability ? (
-                    availability.isAvailable
-                      ? `✓ ${availability.availableRooms} room(s) available for selected dates`
-                      : availability.isClosed
-                        ? '✕ Closed for selected dates'
-                        : `✕ Only ${availability.availableRooms} room(s) available — not enough for this booking`
+                    availability.isAvailable ? (
+                      <><CheckCircle2 className="w-4 h-4 flex-shrink-0" /> {availability.availableRooms} room(s) available for selected dates</>
+                    ) : availability.isClosed ? (
+                      <><XCircle className="w-4 h-4 flex-shrink-0" /> Closed for selected dates</>
+                    ) : (
+                      <><XCircle className="w-4 h-4 flex-shrink-0" /> Only {availability.availableRooms} room(s) available — not enough for this booking</>
+                    )
                   ) : (
                     'Select check-in/check-out dates to see availability'
                   )}
@@ -313,7 +317,7 @@ export default function OfflineBookingPage() {
             </div>
 
             {/* Guest Info */}
-            <div className="card p-5 space-y-4">
+            <div className="rounded-2xl border border-gray-100 bg-white p-5 space-y-4">
               <h2 className="font-semibold text-gray-900">Guest Information</h2>
               <div>
                 <label className="label">Guest Name *</label>
@@ -337,7 +341,7 @@ export default function OfflineBookingPage() {
             </div>
 
             {/* Payment */}
-            <div className="card p-5 space-y-3">
+            <div className="rounded-2xl border border-gray-100 bg-white p-5 space-y-3">
               <h2 className="font-semibold text-gray-900">Payment Method</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {PAYMENT_METHODS.map((pm) => (
@@ -354,14 +358,14 @@ export default function OfflineBookingPage() {
               disabled={submitting || occupancyError}
               className="w-full btn-primary py-4 text-base font-semibold"
             >
-              {submitting ? 'Creating Booking…' : '✅ Confirm Walk-in Booking'}
+              {submitting ? 'Creating Booking…' : 'Confirm Walk-in Booking'}
             </button>
           </form>
         </div>
 
         {/* Price Preview */}
         <div>
-          <div className="card p-5 sticky top-6">
+          <div className="rounded-2xl border border-gray-100 bg-white p-5 sticky top-6">
             <h2 className="font-semibold text-gray-900 mb-4">Price Summary</h2>
             {preview ? (
               <div className="space-y-3 text-sm">
@@ -386,12 +390,12 @@ export default function OfflineBookingPage() {
               </div>
             ) : (
               <div className="text-center py-8 text-gray-400">
-                <p className="text-3xl mb-2">🧾</p>
                 <p className="text-sm">Select a room and dates to see the price breakdown</p>
               </div>
             )}
           </div>
         </div>
+      </div>
       </div>
     </main>
   );

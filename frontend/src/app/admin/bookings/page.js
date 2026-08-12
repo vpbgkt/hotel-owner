@@ -8,7 +8,8 @@ import { formatCurrency } from '@/lib/utils';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
 import BookingDetailsModal from '@/components/admin/BookingDetailsModal';
-import { Eye } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
+import { Eye, Search, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
 
 const STATUS_OPTIONS = ['PENDING', 'CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED', 'NO_SHOW'];
 
@@ -25,12 +26,12 @@ const VALID_TRANSITIONS = {
 };
 
 const STATUS_COLORS = {
-  PENDING: 'bg-yellow-100 text-yellow-800',
-  CONFIRMED: 'bg-blue-100 text-blue-800',
-  CHECKED_IN: 'bg-green-100 text-green-800',
-  CHECKED_OUT: 'bg-gray-100 text-gray-700',
-  CANCELLED: 'bg-red-100 text-red-800',
-  NO_SHOW: 'bg-orange-100 text-orange-800',
+  PENDING: 'bg-yellow-50 text-yellow-700',
+  CONFIRMED: 'bg-blue-50 text-blue-700',
+  CHECKED_IN: 'bg-green-50 text-green-700',
+  CHECKED_OUT: 'bg-gray-100 text-gray-600',
+  CANCELLED: 'bg-red-50 text-red-700',
+  NO_SHOW: 'bg-orange-50 text-orange-700',
 };
 
 export default function AdminBookingsPage() {
@@ -124,104 +125,116 @@ export default function AdminBookingsPage() {
   };
 
   return (
-    <main className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Manage Bookings</h1>
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by booking ID, guest name, or mobile number"
-            className="input w-full sm:w-72 lg:w-[400px]"
-          />
-          <select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="input w-auto"
-          >
-            <option value="">All statuses</option>
-            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
-      </div>
+    <main className="min-h-[80vh] bg-gray-50/50">
+      <AdminPageHeader
+        title="Manage Bookings"
+        description="View, filter, and update reservation statuses"
+        actions={
+          <>
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search booking, guest, or phone"
+                className="input pl-9 w-full sm:w-72"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+              className="input w-auto"
+            >
+              <option value="">All statuses</option>
+              {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            </select>
+          </>
+        }
+      />
 
-      {loadingData ? (
-        <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="h-14 bg-gray-100 animate-pulse rounded" />)}</div>
-      ) : bookings.length === 0 ? (
-        <p className="text-center py-20 text-gray-400">No bookings found</p>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                {['Booking #', 'Guest', 'Room', 'Check-in', 'Check-out', 'Amount', 'Status', 'Action', 'Details'].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-gray-600 font-medium whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {bookings.map((b) => (
-                <tr key={b.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-mono text-xs text-gray-500">{b.bookingNumber}</td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-gray-900">{b.guestName}</p>
-                    <p className="text-gray-400 text-xs">{b.guestPhone || b.guestEmail}</p>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{b.roomType?.name}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{dayjs(b.checkInDate).format('DD MMM YY')}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{dayjs(b.checkOutDate).format('DD MMM YY')}</td>
-                  <td className="px-4 py-3 font-medium">{formatCurrency(b.totalAmount)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[b.status] || 'bg-gray-100'}`}>{b.status}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col gap-1">
-                      <select
-                        disabled={updatingId === b.id || VALID_TRANSITIONS[b.status]?.length === 0}
-                        value={b.status}
-                        onChange={(e) => updateStatus(b.id, e.target.value)}
-                        className="text-xs border rounded px-2 py-1 disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        <option value={b.status}>{b.status}</option>
-                        {(VALID_TRANSITIONS[b.status] || []).map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                      {['CONFIRMED', 'CHECKED_IN'].includes(b.status) && b.bookingType !== 'HOURLY' && (
-                        <button
-                          type="button"
-                          onClick={() => openExtend(b)}
-                          className="text-xs px-2 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
-                        >
-                          ⏳ Extend Stay
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => setDetailsBookingId(b.id)}
-                      className="ps-2 text-gray-500 hover:text-primary-600 transition-colors"
-                      title="View booking details"
-                      aria-label="View booking details"
-                    >
-                      <Eye size={16} className='m-1'/>
-                    </button>
-                  </td>
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 py-8">
+        {loadingData ? (
+          <div className="space-y-2">{[...Array(8)].map((_, i) => <div key={i} className="h-14 bg-gray-100 animate-pulse rounded-xl" />)}</div>
+        ) : bookings.length === 0 ? (
+          <p className="text-center py-20 text-gray-400">No bookings found</p>
+        ) : (
+          <div className="rounded-2xl border border-gray-100 bg-white overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50/80 border-b border-gray-100">
+                <tr>
+                  {['Booking #', 'Guest', 'Room', 'Check-in', 'Check-out', 'Amount', 'Status', 'Action', ''].map((h) => (
+                    <th key={h} className="text-left px-4 py-3.5 text-gray-500 text-xs uppercase tracking-wide font-medium whitespace-nowrap">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {bookings.map((b) => (
+                  <tr key={b.id} className="hover:bg-gray-50/60 transition-colors">
+                    <td className="px-4 py-3.5 font-mono text-xs text-gray-500">{b.bookingNumber}</td>
+                    <td className="px-4 py-3.5">
+                      <p className="font-medium text-gray-900">{b.guestName}</p>
+                      <p className="text-gray-400 text-xs">{b.guestPhone || b.guestEmail}</p>
+                    </td>
+                    <td className="px-4 py-3.5 text-gray-600">{b.roomType?.name}</td>
+                    <td className="px-4 py-3.5 whitespace-nowrap text-gray-600">{dayjs(b.checkInDate).format('DD MMM YY')}</td>
+                    <td className="px-4 py-3.5 whitespace-nowrap text-gray-600">{dayjs(b.checkOutDate).format('DD MMM YY')}</td>
+                    <td className="px-4 py-3.5 font-semibold text-gray-900">{formatCurrency(b.totalAmount)}</td>
+                    <td className="px-4 py-3.5">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[b.status] || 'bg-gray-100 text-gray-600'}`}>{b.status?.replace('_', ' ')}</span>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex flex-col gap-1.5">
+                        <select
+                          disabled={updatingId === b.id || VALID_TRANSITIONS[b.status]?.length === 0}
+                          value={b.status}
+                          onChange={(e) => updateStatus(b.id, e.target.value)}
+                          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          <option value={b.status}>{b.status?.replace('_', ' ')}</option>
+                          {(VALID_TRANSITIONS[b.status] || []).map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+                        </select>
+                        {['CONFIRMED', 'CHECKED_IN'].includes(b.status) && b.bookingType !== 'HOURLY' && (
+                          <button
+                            type="button"
+                            onClick={() => openExtend(b)}
+                            className="flex items-center gap-1 text-xs px-2 py-1 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors"
+                          >
+                            <Clock3 className="w-3 h-3" /> Extend
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <button
+                        type="button"
+                        onClick={() => setDetailsBookingId(b.id)}
+                        className="text-gray-400 hover:text-primary-600 transition-colors p-1.5 rounded-lg hover:bg-primary-50"
+                        title="View booking details"
+                        aria-label="View booking details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-6">
-          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary text-sm px-3 py-1.5">← Prev</button>
-          <span className="text-sm text-gray-500 py-1.5">Page {page} of {totalPages}</span>
-          <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn-secondary text-sm px-3 py-1.5">Next →</button>
-        </div>
-      )}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-3 mt-6">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary text-sm px-3 py-2 flex items-center gap-1">
+              <ChevronLeft className="w-4 h-4" /> Prev
+            </button>
+            <span className="text-sm text-gray-500">Page {page} of {totalPages}</span>
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="btn-secondary text-sm px-3 py-2 flex items-center gap-1">
+              Next <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* ── Extend Stay Modal ─────────────────────────────────────────────── */}
       {extendBooking && (

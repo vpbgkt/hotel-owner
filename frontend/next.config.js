@@ -24,6 +24,13 @@ const nextConfig = {
       },
     ];
   },
+  // /hotel/book was renamed to /rooms/book (single-property site, so "hotel"
+  // in the URL was redundant). Redirect any old bookmarked/shared links.
+  async redirects() {
+    return [
+      { source: '/hotel/book', destination: '/rooms/book', permanent: true },
+    ];
+  },
   turbopack: {
     root: __dirname,
   },

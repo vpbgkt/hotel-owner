@@ -7,8 +7,10 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { formatCurrency } from '@/lib/utils';
 import Modal from '@/components/ui/Modal';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import toast from 'react-hot-toast';
 import { ROOM_AMENITY_OPTIONS } from '@/lib/amenities';
+import { Plus, Upload, ImageOff } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:4000';
 
@@ -59,12 +61,12 @@ function ImageManager({ images, onChange }) {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="text-xs px-3 py-1.5 bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50"
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
           >
-            {uploading ? 'Uploading…' : '📁 Upload'}
+            <Upload className="w-3.5 h-3.5" /> {uploading ? 'Uploading…' : 'Upload'}
           </button>
-          <button type="button" onClick={addUrl} className="text-xs px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50">
-            + Add URL
+          <button type="button" onClick={addUrl} className="flex items-center gap-1 text-xs px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50">
+            <Plus className="w-3.5 h-3.5" /> Add URL
           </button>
         </div>
         <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleUpload} />
@@ -227,43 +229,52 @@ export default function AdminRoomsPage() {
   };
 
   return (
-    <main className="max-w-5xl mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Room Types</h1>
-        <button onClick={openCreate} className="btn-primary">+ Add Room Type</button>
-      </div>
+    <main className="min-h-[80vh] bg-gray-50/50">
+      <AdminPageHeader
+        title="Room Types"
+        description="Manage room categories, pricing, amenities and images"
+        actions={
+          <button onClick={openCreate} className="btn-primary text-sm">
+            <Plus className="w-4 h-4 mr-1.5 inline" />Add Room Type
+          </button>
+        }
+      />
 
-      {loadingData ? (
-        <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-20 bg-gray-100 animate-pulse rounded-xl" />)}</div>
-      ) : roomTypes.length === 0 ? (
-        <p className="text-center py-16 text-gray-400">No room types yet. Add your first one.</p>
-      ) : (
-        <div className="space-y-3">
-          {roomTypes.map((rt) => {
-            const thumb = resolveImgUrl(rt.images?.[0]);
-            return (
-              <div key={rt.id} className="card p-4 flex justify-between items-center gap-4">
-                <div className="flex items-center gap-4">
-                  {thumb ? (
-                    <img src={thumb} alt={rt.name} className="w-16 h-14 object-cover rounded-lg flex-shrink-0" />
-                  ) : (
-                    <div className="w-16 h-14 bg-gray-100 rounded-lg flex items-center justify-center text-gray-300 flex-shrink-0 text-2xl">🏠</div>
-                  )}
-                  <div>
-                    <h3 className="font-semibold text-gray-900">{rt.name}</h3>
-                    <p className="text-sm text-gray-500">{rt.totalRooms} rooms · Max {rt.maxGuests} guests · {formatCurrency(rt.basePriceDaily)}/night</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{rt.images?.length || 0} image(s)</p>
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 py-8">
+        {loadingData ? (
+          <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-20 bg-gray-100 animate-pulse rounded-2xl" />)}</div>
+        ) : roomTypes.length === 0 ? (
+          <p className="text-center py-16 text-gray-400">No room types yet. Add your first one.</p>
+        ) : (
+          <div className="space-y-3">
+            {roomTypes.map((rt) => {
+              const thumb = resolveImgUrl(rt.images?.[0]);
+              return (
+                <div key={rt.id} className="rounded-2xl border border-gray-100 bg-white p-4 flex flex-wrap justify-between items-center gap-4">
+                  <div className="flex items-center gap-4">
+                    {thumb ? (
+                      <img src={thumb} alt={rt.name} className="w-16 h-14 object-cover rounded-lg flex-shrink-0" />
+                    ) : (
+                      <div className="w-16 h-14 bg-gray-50 rounded-lg flex items-center justify-center text-gray-300 flex-shrink-0">
+                        <ImageOff className="w-5 h-5" />
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{rt.name}</h3>
+                      <p className="text-sm text-gray-500">{rt.totalRooms} rooms · Max {rt.maxGuests} guests · {formatCurrency(rt.basePriceDaily)}/night</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{rt.images?.length || 0} image(s)</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button onClick={() => openEdit(rt)} className="btn-secondary text-sm px-3 py-1.5">Edit / Images</button>
+                    <button onClick={() => deleteRoomType(rt.id)} className="text-sm px-3 py-1.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50">Delete</button>
                   </div>
                 </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <button onClick={() => openEdit(rt)} className="btn-secondary text-sm px-3 py-1.5">Edit / Images</button>
-                  <button onClick={() => deleteRoomType(rt.id)} className="text-sm px-3 py-1.5 border border-red-300 text-red-600 rounded hover:bg-red-50">Delete</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Room Type' : 'Add Room Type'}>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">

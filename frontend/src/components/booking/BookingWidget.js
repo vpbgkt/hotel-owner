@@ -119,19 +119,19 @@ function DailyBookingForm({ hotel, selectedRT, selectedRoomType }) {
       )}
 
       {availability && (
-        <div className={`rounded-xl p-4 text-sm ${availability.isAvailable ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+        <div className={`rounded-xl p-4 text-sm ${availability.isAvailable ? 'bg-primary-50 border border-primary-200' : 'bg-red-50 border border-red-200'}`}>
           {availability.isAvailable ? (
-            <div className="text-green-800">
+            <div className="text-gray-700">
               <div className="flex items-center justify-between mb-2">
-                <p className="font-semibold text-green-900">✓ Available</p>
-                <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-medium">
+                <p className="font-semibold text-primary-800">✓ Available</p>
+                <span className="text-xs bg-primary-100 text-primary-800 px-2 py-0.5 rounded-full font-medium">
                   {availability.availableRooms} room{availability.availableRooms !== 1 ? 's' : ''} left
                 </span>
               </div>
               <div className="space-y-1">
                 <div className="flex justify-between"><span>{availability.nights} night{availability.nights > 1 ? 's' : ''} × {formatCurrency(availability.pricePerNight)}</span><span>{formatCurrency(availability.subtotal ?? availability.totalPrice)}</span></div>
-                {availability.taxAmount > 0 && <div className="flex justify-between text-green-700"><span>GST ({Math.round((availability.taxRate ?? 0.12) * 100)}%)</span><span>+{formatCurrency(availability.taxAmount)}</span></div>}
-                <div className="flex justify-between font-bold text-green-900 pt-1 border-t border-green-200 mt-1"><span>Total</span><span>{formatCurrency(availability.totalPrice)}</span></div>
+                {availability.taxAmount > 0 && <div className="flex justify-between text-gray-500"><span>GST ({Math.round((availability.taxRate ?? 0.12) * 100)}%)</span><span>+{formatCurrency(availability.taxAmount)}</span></div>}
+                <div className="flex justify-between font-bold text-primary-900 pt-2 border-t border-primary-200 mt-1"><span>Total</span><span>{formatCurrency(availability.totalPrice)}</span></div>
               </div>
             </div>
           ) : (
@@ -240,7 +240,7 @@ function HourlyBookingForm({ hotel, selectedRT, selectedRoomType }) {
                 <input type="number" min={1} max={selectedRT?.maxHours || 12} className="input"
                   value={numHours} onChange={(e) => setNumHours(Math.max(1, parseInt(e.target.value) || 1))} />
               </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-800">
+              <div className="bg-primary-50 border border-primary-200 rounded-xl p-3 text-sm text-primary-800">
                 <div className="flex justify-between"><span>{numHours}h × {formatCurrency(pricePerHour)}/hr</span><span className="font-bold">{formatCurrency(total)}</span></div>
               </div>
               <div><label className="label">Name</label><input className="input" placeholder="Full name" value={guestInfo.name} onChange={(e) => setGuestInfo((p) => ({ ...p, name: e.target.value }))} /></div>
@@ -271,8 +271,11 @@ export default function BookingWidget({ hotel, roomTypes }) {
   const effectiveTab = bookingModel === 'HOURLY' ? 'hourly' : bookTab;
 
   return (
-    <div className="card p-6 sticky top-4">
-      <h3 className="text-lg font-semibold mb-4">Book Your Stay</h3>
+    <div className="rounded-2xl border border-gray-100 shadow-lg shadow-gray-100/60 p-6 bg-white">
+      <div className="flex items-center justify-between mb-5 pb-4 border-b border-gray-100">
+        <h3 className="font-display text-xl font-semibold text-gray-900">Book Your Stay</h3>
+        <span className="text-xs uppercase tracking-widest text-primary-600 font-semibold">Best Rate</span>
+      </div>
 
       {/* Room Type Selector */}
       {roomTypes.length > 1 && (
@@ -288,13 +291,13 @@ export default function BookingWidget({ hotel, roomTypes }) {
 
       {/* Tab selector — only if both types are available */}
       {bookingModel === 'BOTH' && (
-        <div className="flex rounded-lg bg-gray-100 p-1 mb-4">
+        <div className="flex rounded-full bg-gray-100 p-1 mb-5">
           <button type="button" onClick={() => setBookTab('daily')}
-            className={`flex-1 py-1.5 text-sm rounded-md font-medium transition-colors ${effectiveTab === 'daily' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>
+            className={`flex-1 py-2 text-sm rounded-full font-medium transition-colors ${effectiveTab === 'daily' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>
             🗓️ Daily
           </button>
           <button type="button" onClick={() => setBookTab('hourly')}
-            className={`flex-1 py-1.5 text-sm rounded-md font-medium transition-colors ${effectiveTab === 'hourly' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>
+            className={`flex-1 py-2 text-sm rounded-full font-medium transition-colors ${effectiveTab === 'hourly' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>
             ⏰ Hourly
           </button>
         </div>

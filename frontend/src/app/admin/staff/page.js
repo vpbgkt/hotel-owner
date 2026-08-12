@@ -6,7 +6,9 @@ import { adminApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Modal from '@/components/ui/Modal';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import toast from 'react-hot-toast';
+import { Plus } from 'lucide-react';
 
 const ROLES = ['HOTEL_ADMIN', 'RECEPTIONIST', 'MANAGER', 'HOUSEKEEPING'];
 
@@ -69,46 +71,53 @@ export default function AdminStaffPage() {
   };
 
   return (
-    <main className="max-w-4xl mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Staff Management</h1>
-        <button onClick={openCreate} className="btn-primary">+ Add Staff</button>
-      </div>
+    <main className="min-h-[80vh] bg-gray-50/50">
+      <AdminPageHeader
+        title="Staff Management"
+        description="Manage your team and their access roles"
+        actions={
+          <button onClick={openCreate} className="btn-primary text-sm">
+            <Plus className="w-4 h-4 mr-1.5 inline" />Add Staff
+          </button>
+        }
+      />
 
-      {loadingData ? (
-        <div className="space-y-3">{[...Array(5)].map((_, i) => <div key={i} className="h-16 bg-gray-100 animate-pulse rounded-xl" />)}</div>
-      ) : staff.length === 0 ? (
-        <p className="text-center py-16 text-gray-400">No staff members yet.</p>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                {['Name', 'Email', 'Role', 'Actions'].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-gray-600 font-medium">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {staff.map((member) => (
-                <tr key={member.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{member.user?.name}</td>
-                  <td className="px-4 py-3 text-gray-500">{member.user?.email}</td>
-                  <td className="px-4 py-3">
-                    <span className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full">{member.role}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      <button onClick={() => openEdit(member)} className="text-xs btn-secondary px-2 py-1">Edit Role</button>
-                      <button onClick={() => removeStaff(member.id)} className="text-xs px-2 py-1 border border-red-300 text-red-600 rounded hover:bg-red-50">Remove</button>
-                    </div>
-                  </td>
+      <div className="max-w-4xl mx-auto px-5 sm:px-8 py-8">
+        {loadingData ? (
+          <div className="space-y-3">{[...Array(5)].map((_, i) => <div key={i} className="h-16 bg-gray-100 animate-pulse rounded-2xl" />)}</div>
+        ) : staff.length === 0 ? (
+          <p className="text-center py-16 text-gray-400">No staff members yet.</p>
+        ) : (
+          <div className="rounded-2xl border border-gray-100 bg-white overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50/80 border-b border-gray-100">
+                <tr>
+                  {['Name', 'Email', 'Role', 'Actions'].map((h) => (
+                    <th key={h} className="text-left px-4 py-3.5 text-gray-500 text-xs uppercase tracking-wide font-medium">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {staff.map((member) => (
+                  <tr key={member.id} className="hover:bg-gray-50/60 transition-colors">
+                    <td className="px-4 py-3.5 font-medium text-gray-900">{member.user?.name}</td>
+                    <td className="px-4 py-3.5 text-gray-500">{member.user?.email}</td>
+                    <td className="px-4 py-3.5">
+                      <span className="text-xs bg-primary-50 text-primary-700 px-2.5 py-1 rounded-full font-medium">{member.role}</span>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex gap-2">
+                        <button onClick={() => openEdit(member)} className="text-xs btn-secondary px-3 py-1.5">Edit Role</button>
+                        <button onClick={() => removeStaff(member.id)} className="text-xs px-3 py-1.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50">Remove</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Staff Role' : 'Add Staff Member'}>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

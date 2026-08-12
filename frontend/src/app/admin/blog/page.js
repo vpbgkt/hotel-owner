@@ -6,8 +6,10 @@ import { blogApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import Modal from '@/components/ui/Modal';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
+import { Plus } from 'lucide-react';
 
 export default function AdminBlogPage() {
   const { user, loading, isAuthenticated } = useAuth();
@@ -83,41 +85,48 @@ export default function AdminBlogPage() {
   };
 
   return (
-    <main className="max-w-5xl mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Blog Posts</h1>
-        <button onClick={openCreate} className="btn-primary">+ New Post</button>
-      </div>
+    <main className="min-h-[80vh] bg-gray-50/50">
+      <AdminPageHeader
+        title="Blog Posts"
+        description="Manage articles published on the hotel website"
+        actions={
+          <button onClick={openCreate} className="btn-primary text-sm">
+            <Plus className="w-4 h-4 mr-1.5 inline" />New Post
+          </button>
+        }
+      />
 
-      {loadingData ? (
-        <div className="space-y-3">{[...Array(5)].map((_, i) => <div key={i} className="h-16 bg-gray-100 animate-pulse rounded-xl" />)}</div>
-      ) : posts.length === 0 ? (
-        <p className="text-center py-16 text-gray-400">No blog posts yet.</p>
-      ) : (
-        <div className="space-y-2">
-          {posts.map((post) => (
-            <div key={post.id} className="card p-4 flex justify-between items-center">
-              <div className="min-w-0 flex-1">
-                <h3 className="font-medium text-gray-900 truncate">{post.title}</h3>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {dayjs(post.createdAt).format('DD MMM YYYY')} ·{' '}
-                  <span className={post.status === 'PUBLISHED' ? 'text-green-600' : 'text-gray-400'}>{post.status}</span>
-                </p>
+      <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8">
+        {loadingData ? (
+          <div className="space-y-3">{[...Array(5)].map((_, i) => <div key={i} className="h-16 bg-gray-100 animate-pulse rounded-2xl" />)}</div>
+        ) : posts.length === 0 ? (
+          <p className="text-center py-16 text-gray-400">No blog posts yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {posts.map((post) => (
+              <div key={post.id} className="rounded-2xl border border-gray-100 bg-white p-4 flex flex-wrap justify-between items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-medium text-gray-900 truncate">{post.title}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {dayjs(post.createdAt).format('DD MMM YYYY')} ·{' '}
+                    <span className={post.status === 'PUBLISHED' ? 'text-green-600' : 'text-gray-400'}>{post.status}</span>
+                  </p>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button onClick={() => openEdit(post)} className="btn-secondary text-xs px-3 py-1.5">Edit</button>
+                  <button
+                    onClick={() => togglePublish(post)}
+                    className={`text-xs px-3 py-1.5 rounded-lg border ${post.status === 'PUBLISHED' ? 'border-yellow-200 text-yellow-700 hover:bg-yellow-50' : 'border-green-200 text-green-700 hover:bg-green-50'}`}
+                  >
+                    {post.status === 'PUBLISHED' ? 'Archive' : 'Publish'}
+                  </button>
+                  <button onClick={() => deletePost(post.id)} className="text-xs px-3 py-1.5 border border-red-200 text-red-600 rounded-lg hover:bg-red-50">Delete</button>
+                </div>
               </div>
-              <div className="flex gap-2 ml-4 flex-shrink-0">
-                <button onClick={() => openEdit(post)} className="btn-secondary text-xs px-2 py-1">Edit</button>
-                <button
-                  onClick={() => togglePublish(post)}
-                  className={`text-xs px-2 py-1 rounded border ${post.status === 'PUBLISHED' ? 'border-yellow-300 text-yellow-700 hover:bg-yellow-50' : 'border-green-300 text-green-700 hover:bg-green-50'}`}
-                >
-                  {post.status === 'PUBLISHED' ? 'Archive' : 'Publish'}
-                </button>
-                <button onClick={() => deletePost(post.id)} className="text-xs px-2 py-1 border border-red-300 text-red-600 rounded hover:bg-red-50">Del</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Post' : 'New Post'} maxWidth="max-w-2xl">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

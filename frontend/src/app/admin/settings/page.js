@@ -6,8 +6,9 @@ import { adminApi, hotelsApi, uploadApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import Link from 'next/link';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
 import { HOTEL_AMENITY_OPTIONS } from '@/lib/amenities';
+import { Upload, Plus, X } from 'lucide-react';
 
 const HOTEL_ID = '11111111-1111-1111-1111-111111111111';
 const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:4000';
@@ -45,10 +46,10 @@ function ImageUploadField({ label, value, onChange, hint }) {
         <div className="flex-1 space-y-2">
           <input type="text" className="input text-sm" placeholder="Paste image URL or upload a file" value={value || ''} onChange={(e) => onChange(e.target.value)} />
           <div className="flex gap-2">
-            <button type="button" onClick={() => ref.current?.click()} disabled={uploading} className="text-xs px-3 py-1.5 bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50">
-              {uploading ? 'Uploading…' : '📁 Upload File'}
+            <button type="button" onClick={() => ref.current?.click()} disabled={uploading} className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+              <Upload className="w-3.5 h-3.5" /> {uploading ? 'Uploading…' : 'Upload File'}
             </button>
-            {value && <button type="button" onClick={() => onChange('')} className="text-xs px-3 py-1.5 border text-red-600 border-red-200 rounded hover:bg-red-50">Remove</button>}
+            {value && <button type="button" onClick={() => onChange('')} className="text-xs px-3 py-1.5 border text-red-600 border-red-200 rounded-lg hover:bg-red-50">Remove</button>}
           </div>
           {hint && <p className="text-xs text-gray-400">{hint}</p>}
           <input ref={ref} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
@@ -69,6 +70,8 @@ export default function AdminSettingsPage() {
   const [selectedAmenities, setSelectedAmenities] = useState([]);
   const [amenityOptions, setAmenityOptions] = useState(HOTEL_AMENITY_OPTIONS);
   const [newAmenity, setNewAmenity] = useState('');
+  const [primaryColor, setPrimaryColor] = useState('#c5a880');
+  const [backgroundColor, setBackgroundColor] = useState('#ffffff');
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
@@ -84,6 +87,8 @@ export default function AdminSettingsPage() {
         setCoverImageUrl(h.coverImageUrl || '');
         setLogoUrl(h.logoUrl || '');
         setHeroImages(h.heroImages || []);
+        setPrimaryColor(h.themeConfig?.primaryColor || '#c5a880');
+        setBackgroundColor(h.themeConfig?.backgroundColor || '#ffffff');
         const savedAmenities = h.amenities || [];
         setSelectedAmenities(savedAmenities);
         // Make sure any custom amenities already saved on the hotel (but not
@@ -119,7 +124,11 @@ export default function AdminSettingsPage() {
     try {
       const gstRate = parseFloat(data.gstRate) / 100;
       if (isNaN(gstRate) || gstRate < 0 || gstRate > 1) { toast.error('GST must be 0–100'); setSaving(false); return; }
-      await adminApi.updateHotel({ ...data, gstRate, coverImageUrl, logoUrl, heroImages, amenities: selectedAmenities });
+      await adminApi.updateHotel({
+        ...data, gstRate, coverImageUrl, logoUrl, heroImages,
+        amenities: selectedAmenities,
+        themeConfig: { primaryColor, backgroundColor },
+      });
       toast.success('Settings saved!');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to save');
@@ -145,21 +154,20 @@ export default function AdminSettingsPage() {
   if (loading || !user) return null;
 
   const tabs = [
-    { id: 'branding', label: '🖼️ Branding' },
-    { id: 'general', label: '🏨 General' },
-    { id: 'amenities', label: '✨ Amenities' },
-    { id: 'tax', label: '💰 Tax & GST' },
-    { id: 'timing', label: '🕐 Timings' },
-    { id: 'contact', label: '📞 Contact' },
+    { id: 'branding', label: 'Branding' },
+    { id: 'theme', label: 'Theme' },
+    { id: 'general', label: 'General' },
+    { id: 'amenities', label: 'Amenities' },
+    { id: 'tax', label: 'Tax & GST' },
+    { id: 'timing', label: 'Timings' },
+    { id: 'contact', label: 'Contact' },
   ];
 
   return (
-    <main className="max-w-4xl mx-auto px-4 py-8">
-      <div className="flex items-center gap-4 mb-6">
-        <Link href="/admin" className="text-gray-400 hover:text-gray-600 transition-colors">← Admin</Link>
-        <h1 className="text-2xl font-bold text-gray-900">Hotel Settings</h1>
-      </div>
+    <main className="min-h-[80vh] bg-gray-50/50">
+      <AdminPageHeader title="Hotel Settings" description="Manage branding, theme, tax and contact information" />
 
+      <div className="max-w-4xl mx-auto px-5 sm:px-8 py-8">
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 overflow-x-auto">
         {tabs.map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -183,7 +191,7 @@ export default function AdminSettingsPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="label mb-0">Gallery Images</label>
-                <button type="button" onClick={() => setHeroImages((p) => [...p, ''])} className="text-xs px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50">+ Add Image</button>
+                <button type="button" onClick={() => setHeroImages((p) => [...p, ''])} className="flex items-center gap-1 text-xs px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50"><Plus className="w-3.5 h-3.5" /> Add Image</button>
               </div>
               {heroImages.length === 0 && <p className="text-xs text-gray-400 italic">No gallery images yet.</p>}
               <div className="space-y-2">
@@ -192,11 +200,113 @@ export default function AdminSettingsPage() {
                     {resolveImg(url) && <img src={resolveImg(url)} alt="" className="w-12 h-10 object-cover rounded border flex-shrink-0" onError={(e) => (e.target.style.display = 'none')} />}
                     <input type="text" className="input flex-1 text-sm" placeholder="Image URL" value={url}
                       onChange={(e) => { const n = [...heroImages]; n[i] = e.target.value; setHeroImages(n); }} />
-                    <button type="button" onClick={() => setHeroImages((h) => h.filter((_, idx) => idx !== i))} className="text-red-500 hover:text-red-700 text-xl leading-none">×</button>
+                    <button type="button" onClick={() => setHeroImages((h) => h.filter((_, idx) => idx !== i))} className="text-red-500 hover:text-red-700 flex-shrink-0"><X className="w-4 h-4" /></button>
                   </div>
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'theme' && (
+          <div className="card p-6 space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Theme &amp; Colors</h2>
+              <p className="text-sm text-gray-500">Set the primary accent and page background used across the guest-facing website. Changes apply site-wide after saving.</p>
+            </div>
+
+            {/* Primary color */}
+            <div>
+              <label className="label">Primary Color</label>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="color"
+                  value={primaryColor}
+                  onChange={(e) => setPrimaryColor(e.target.value)}
+                  className="h-11 w-14 rounded-lg border border-gray-300 cursor-pointer p-1 bg-white"
+                  aria-label="Pick primary color"
+                />
+                <input
+                  type="text"
+                  value={primaryColor}
+                  onChange={(e) => setPrimaryColor(e.target.value)}
+                  className="input w-32 font-mono text-sm"
+                  placeholder="#c5a880"
+                />
+                <div className="flex items-center gap-1.5">
+                  {['#c5a880', '#1cc3b2', '#b8860b', '#0f766e', '#9333ea', '#dc2626', '#2563eb', '#111827'].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setPrimaryColor(c)}
+                      className={`w-7 h-7 rounded-full border-2 transition ${primaryColor.toLowerCase() === c ? 'border-gray-900 scale-110' : 'border-white shadow'}`}
+                      style={{ backgroundColor: c }}
+                      aria-label={`Use ${c}`}
+                    />
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">Used for buttons, links, highlights and accents. Default: #c5a880</p>
+            </div>
+
+            {/* Background color */}
+            <div>
+              <label className="label">Background Color</label>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="color"
+                  value={backgroundColor}
+                  onChange={(e) => setBackgroundColor(e.target.value)}
+                  className="h-11 w-14 rounded-lg border border-gray-300 cursor-pointer p-1 bg-white"
+                  aria-label="Pick background color"
+                />
+                <input
+                  type="text"
+                  value={backgroundColor}
+                  onChange={(e) => setBackgroundColor(e.target.value)}
+                  className="input w-32 font-mono text-sm"
+                  placeholder="#ffffff"
+                />
+                <div className="flex items-center gap-1.5">
+                  {['#ffffff', '#fafaf9', '#f8fafc', '#f5f5f4'].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setBackgroundColor(c)}
+                      className={`w-7 h-7 rounded-full border-2 transition ${backgroundColor.toLowerCase() === c ? 'border-gray-900 scale-110' : 'border-gray-300'}`}
+                      style={{ backgroundColor: c }}
+                      aria-label={`Use ${c}`}
+                    />
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 mt-2">Main page background. Default: #ffffff (white)</p>
+            </div>
+
+            {/* Live preview */}
+            <div className="rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500">Preview</div>
+              <div className="p-6" style={{ backgroundColor }}>
+                <p className="font-semibold text-gray-900 mb-3">Sample content</p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button type="button" className="px-5 py-2.5 rounded-full text-white font-medium shadow-sm" style={{ backgroundColor: primaryColor }}>
+                    Book Now
+                  </button>
+                  <span className="font-medium" style={{ color: primaryColor }}>Accent link</span>
+                  <span className="text-xs px-3 py-1 rounded-full font-medium" style={{ backgroundColor: primaryColor + '22', color: primaryColor }}>
+                    Badge
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => { setPrimaryColor('#c5a880'); setBackgroundColor('#ffffff'); }}
+              className="text-sm text-gray-500 hover:text-gray-700 underline"
+            >
+              Reset to defaults
+            </button>
           </div>
         )}
 
@@ -243,8 +353,8 @@ export default function AdminSettingsPage() {
                   placeholder="e.g. Pet Friendly"
                   className="input text-sm py-1.5 w-44"
                 />
-                <button type="button" onClick={addAmenity} className="text-xs px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 whitespace-nowrap">
-                  + Add amenities option
+                <button type="button" onClick={addAmenity} className="flex items-center gap-1 text-xs px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap">
+                  <Plus className="w-3.5 h-3.5" /> Add amenities option
                 </button>
               </div>
             </div>
@@ -308,6 +418,7 @@ export default function AdminSettingsPage() {
           </button>
         </div>
       </form>
+      </div>
     </main>
   );
 }

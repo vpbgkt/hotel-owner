@@ -4,8 +4,23 @@
 
 @layer base {
   :root {
+    /* ── Theme tokens (overridable at runtime by ThemeInjector) ───────────
+       Primary shades are stored as space-separated RGB channels so Tailwind's
+       `/<alpha-value>` opacity modifier keeps working. Default palette is a
+       warm hospitality gold based on #c5a880. */
+    --primary-50: 250 246 240;
+    --primary-100: 244 236 224;
+    --primary-200: 233 217 191;
+    --primary-300: 219 195 157;
+    --primary-400: 205 178 138;
+    --primary-500: 197 168 128; /* #c5a880 */
+    --primary-600: 176 147 106;
+    --primary-700: 148 122 84;
+    --primary-800: 118 97 68;
+    --primary-900: 92 76 54;
+
     --background: #ffffff;
-    --foreground: #171717;
+    --foreground: #1c1917;
   }
 
   html {
@@ -15,21 +30,31 @@
   body {
     background-color: var(--background);
     color: var(--foreground);
-    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-inter), 'Inter', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Display headings use the serif face for a premium hospitality feel. */
+  .font-display {
+    font-family: var(--font-playfair), 'Cormorant Garamond', Georgia, ui-serif, serif;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg bg-primary-600 text-white font-medium hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer;
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-full bg-primary-600 text-white font-medium tracking-wide hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm hover:shadow-md;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer;
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-full border border-gray-300 bg-white text-gray-700 font-medium hover:border-primary-400 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer;
+  }
+
+  .btn-outline-light {
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-full border border-white/40 bg-white/10 text-white font-medium hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all cursor-pointer backdrop-blur-sm;
   }
 
   .input {
-    @apply w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 transition-shadow;
+    @apply w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 transition-shadow;
   }
 
   .label {
@@ -42,5 +67,16 @@
 
   .card {
     @apply bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden;
+  }
+
+  /* Small uppercase eyebrow label used above section titles */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary-600;
+  }
+
+  .eyebrow::before,
+  .eyebrow::after {
+    content: '';
+    @apply block h-px w-8 bg-primary-400/70;
   }
 }

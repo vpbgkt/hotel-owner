@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, BedDouble } from 'lucide-react';
 
 function resolveImg(url) {
   if (!url) return null;
@@ -17,7 +18,9 @@ export function RoomCardSlideshow({ images = [], alt = 'Room image', fallback })
 
   if (srcs.length === 0) {
     return (
-      <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300 text-4xl">🛏️</div>
+      <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-300">
+        <BedDouble className="w-10 h-10" />
+      </div>
     );
   }
 
@@ -34,8 +37,8 @@ export function RoomCardSlideshow({ images = [], alt = 'Room image', fallback })
       />
       {srcs.length > 1 && (
         <>
-          <button onClick={prev} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-lg leading-none" aria-label="Previous">‹</button>
-          <button onClick={next} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-lg leading-none" aria-label="Next">›</button>
+          <button onClick={prev} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Previous"><ChevronLeft className="w-4 h-4" /></button>
+          <button onClick={next} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Next"><ChevronRight className="w-4 h-4" /></button>
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
             {srcs.map((_, i) => (
               <button key={i} onClick={(e) => { e.stopPropagation(); setCurrent(i); }} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === current ? 'bg-white' : 'bg-white/50'}`} aria-label={`Image ${i + 1}`} />
@@ -95,19 +98,19 @@ export default function RoomImageSlideshow({ images = [], name = '' }) {
           <button
             onClick={prev}
             aria-label="Previous image"
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/70 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl leading-none backdrop-blur-sm transition-all hover:scale-110"
-          >‹</button>
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/70 text-white rounded-full w-11 h-11 flex items-center justify-center backdrop-blur-sm transition-all hover:scale-110"
+          ><ChevronLeft className="w-5 h-5" /></button>
           <button
             onClick={next}
             aria-label="Next image"
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/70 text-white rounded-full w-12 h-12 flex items-center justify-center text-2xl leading-none backdrop-blur-sm transition-all hover:scale-110"
-          >›</button>
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 hover:bg-black/70 text-white rounded-full w-11 h-11 flex items-center justify-center backdrop-blur-sm transition-all hover:scale-110"
+          ><ChevronRight className="w-5 h-5" /></button>
         </>
       )}
 
       {/* Dot indicators */}
       {srcs.length > 1 && (
-        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-10 flex gap-2">
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10 flex gap-2">
           {srcs.map((_, i) => (
             <button
               key={i}
@@ -117,23 +120,6 @@ export default function RoomImageSlideshow({ images = [], name = '' }) {
                 i === current ? 'bg-white w-7 h-2.5' : 'bg-white/50 hover:bg-white/80 w-2.5 h-2.5'
               }`}
             />
-          ))}
-        </div>
-      )}
-
-      {/* Thumbnail strip */}
-      {srcs.length > 1 && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex gap-2 px-3 py-1.5 bg-black/30 backdrop-blur-sm rounded-xl">
-          {srcs.map((src, i) => (
-            <button
-              key={i}
-              onClick={() => go(i)}
-              className={`w-16 h-11 rounded-lg overflow-hidden border-2 transition-all duration-200 flex-shrink-0 ${
-                i === current ? 'border-white scale-105 shadow-lg' : 'border-transparent opacity-60 hover:opacity-90'
-              }`}
-            >
-              <img src={src} alt="" className="w-full h-full object-cover" draggable={false} />
-            </button>
           ))}
         </div>
       )}
