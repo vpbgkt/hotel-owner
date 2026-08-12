@@ -7,6 +7,7 @@ import { authApi } from '@/lib/api';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
+import AuthCard from '@/components/auth/AuthCard';
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -33,10 +34,7 @@ function ResetPasswordForm() {
   };
 
   return (
-    <div className="w-full max-w-sm card p-8">
-      <h1 className="text-2xl font-bold text-center mb-2">Reset Password</h1>
-      <p className="text-center text-gray-500 text-sm mb-6">Enter your new password below</p>
-
+    <AuthCard title="Reset Password" subtitle="Enter your new password below" maxWidth="max-w-sm">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>
           <label className="label">New Password</label>
@@ -69,19 +67,21 @@ function ResetPasswordForm() {
         </button>
       </form>
 
-      <p className="text-center text-sm text-gray-500 mt-4">
+      <p className="text-center text-sm text-gray-500 mt-5">
         <Link href="/auth/login" className="text-primary-600 hover:underline">Back to Sign In</Link>
       </p>
-    </div>
+    </AuthCard>
   );
 }
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <Suspense fallback={<div className="animate-spin h-8 w-8 rounded-full border-b-2 border-primary-600" />}>
-        <ResetPasswordForm />
-      </Suspense>
-    </div>
+    <Suspense fallback={
+      <div className="min-h-[75vh] flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 rounded-full border-b-2 border-primary-600" />
+      </div>
+    }>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
