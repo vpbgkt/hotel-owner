@@ -152,7 +152,7 @@ export default function BookingDetailPage() {
 
   return (
     <main className="bg-white min-h-[70vh]">
-      <div className="max-w-3xl mx-auto px-5 sm:px-8 py-10 lg:py-14">
+      <div className="max-w-3xl mx-auto px-5 sm:px-8 py-10 lg:py-14 border border-gray-100 my-5 rounded-lg">
         {/* Back button */}
         <button
           onClick={() => router.back()}

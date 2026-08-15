@@ -121,20 +121,29 @@ class AdminService {
     });
 
     const updates = {};
-    if (availableCount !== undefined) updates.availableCount = availableCount;
+    // See bulkUpdateInventory: "Available Count" is a manual cap stored in
+    // overrideAvailable and clamped to the room type's totalRooms.
+    if (availableCount !== undefined) {
+      updates.overrideAvailable = Math.max(0, Math.min(availableCount, roomType.totalRooms));
+    }
     if (priceOverride !== undefined) updates.priceOverride = priceOverride;
     if (isClosed !== undefined) updates.isClosed = isClosed;
 
     await inv.update(updates);
+    require('./room.service').invalidateAvailabilityCache(roomTypeId);
     return inv;
   }
 
-  async bulkUpdateInventory(hotelId, { roomTypeId, startDate, endDate, availableCount, priceOverride, isClosed, minStayNights }) {
+  async bulkUpdateInventory(hotelId, { roomTypeId, startDate, endDate, availableCount, priceOverride, isClosed, minStayNights, resetToDefault }) {
     const roomType = await RoomType.findOne({ where: { id: roomTypeId, hotelId } });
     if (!roomType) throw createError('Room type not found', 404);
 
     const roomService = require('./room.service');
-    const dates = roomService._getDateRange(startDate, endDate);
+    // _getDateRange is exclusive of the end date (correct for booking checkout
+    // nights). For a bulk inventory update the admin picks an inclusive
+    // Start/End range, so extend by one day to include the selected end date.
+    const inclusiveEnd = dayjs(endDate).add(1, 'day').format('YYYY-MM-DD');
+    const dates = roomService._getDateRange(startDate, inclusiveEnd);
     const updates = [];
 
     for (const date of dates) {
@@ -143,16 +152,31 @@ class AdminService {
         defaults: { roomTypeId, date, availableCount: roomType.totalRooms },
       });
 
-      const updateData = {};
-      if (availableCount !== undefined) updateData.availableCount = availableCount;
-      if (priceOverride !== undefined) updateData.priceOverride = priceOverride;
-      if (isClosed !== undefined) updateData.isClosed = isClosed;
-      if (minStayNights !== undefined) updateData.minStayNights = minStayNights;
+      let updateData;
+      if (resetToDefault) {
+        // Clear every admin override for the date: availability reverts to the
+        // booking-derived full stock (overrideAvailable = null), price reverts
+        // to the room type's base price (priceOverride = null), the date is
+        // reopened and min-stay returns to the default of 1 night.
+        updateData = { overrideAvailable: null, priceOverride: null, isClosed: false, minStayNights: 1 };
+      } else {
+        updateData = {};
+        // "Available Count" is a manual cap on sellable rooms for the date.
+        // Stored in overrideAvailable (not availableCount, which the booking flow
+        // mutates) and clamped to the room type's totalRooms.
+        if (availableCount !== undefined) {
+          updateData.overrideAvailable = Math.max(0, Math.min(availableCount, roomType.totalRooms));
+        }
+        if (priceOverride !== undefined) updateData.priceOverride = priceOverride;
+        if (isClosed !== undefined) updateData.isClosed = isClosed;
+        if (minStayNights !== undefined) updateData.minStayNights = minStayNights;
+      }
 
       await inv.update(updateData);
       updates.push({ date, ...updateData });
     }
 
+    await roomService.invalidateAvailabilityCache(roomTypeId);
     return { updatedDates: updates.length, dates: updates };
   }
 

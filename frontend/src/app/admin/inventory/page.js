@@ -19,6 +19,7 @@ export default function AdminInventoryPage() {
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   // Bulk update form
   const [bulkForm, setBulkForm] = useState({
@@ -76,17 +77,48 @@ export default function AdminInventoryPage() {
     try {
       const res = await adminApi.bulkUpdateInventory(payload);
       toast.success(`Updated ${res.data.data.updatedDates} dates`);
-      // Refresh calendar
-      const startDate = viewMonth.format('YYYY-MM-DD');
-      const endDate = viewMonth.endOf('month').format('YYYY-MM-DD');
-      roomsApi.getInventoryCalendar(selectedRoom.id, { startDate, endDate })
-        .then((r) => setCalendar(r.data.data?.calendar || []))
-        .catch(() => {});
+      refreshCalendar();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Update failed');
     } finally {
       setSaving(false);
     }
+  };
+
+  // Clears every admin override (availability cap, price override, closure,
+  // min-stay) across the selected date range, reverting those dates to the room
+  // type's defaults. A blank field means "no change", so this is the only way to
+  // actively remove an existing override from the UI.
+  const resetRangeToDefault = async () => {
+    if (!selectedRoom) return;
+    if (!confirm(`Reset ${selectedRoom.name} to default from ${bulkForm.startDate} to ${bulkForm.endDate}?\n\nThis clears any availability cap, price override, and closure for these dates.`)) return;
+
+    setResetting(true);
+    try {
+      const res = await adminApi.bulkUpdateInventory({
+        roomTypeId: selectedRoom.id,
+        startDate: bulkForm.startDate,
+        endDate: bulkForm.endDate,
+        resetToDefault: true,
+      });
+      toast.success(`Reset ${res.data.data.updatedDates} dates to default`);
+      // Clear the form's override inputs to reflect the cleared state.
+      setBulkForm((f) => ({ ...f, availableCount: '', priceOverride: '', isClosed: false }));
+      refreshCalendar();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Reset failed');
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const refreshCalendar = () => {
+    if (!selectedRoom) return;
+    const startDate = viewMonth.format('YYYY-MM-DD');
+    const endDate = viewMonth.endOf('month').format('YYYY-MM-DD');
+    roomsApi.getInventoryCalendar(selectedRoom.id, { startDate, endDate })
+      .then((r) => setCalendar(r.data.data?.calendar || []))
+      .catch(() => {});
   };
 
   // Build calendar grid
@@ -185,11 +217,21 @@ export default function AdminInventoryPage() {
                 </label>
                 <button
                   onClick={applyBulkUpdate}
-                  disabled={saving}
+                  disabled={saving || resetting}
                   className="w-full btn-primary text-sm py-2"
                 >
                   {saving ? 'Updating…' : 'Apply to Date Range'}
                 </button>
+                <button
+                  onClick={resetRangeToDefault}
+                  disabled={saving || resetting}
+                  className="w-full text-sm py-2 border border-gray-300 rounded-full text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+                >
+                  {resetting ? 'Resetting…' : 'Reset Range to Default'}
+                </button>
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  Reset clears any availability cap, price override, and closure for the selected dates.
+                </p>
               </div>
             </div>
           )}

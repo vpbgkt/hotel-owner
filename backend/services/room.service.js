@@ -69,7 +69,11 @@ class RoomService {
       const inv = inventoryMap[date];
       if (inv && inv.isClosed) { isClosed = true; break; }
       const booked = bookedMap[date] || 0;
-      minAvailable = Math.min(minAvailable, roomType.totalRooms - booked);
+      // An admin-set manual cap (overrideAvailable) limits sellable rooms for
+      // the date; otherwise the full room count applies. Bookings are still
+      // subtracted live so availability never oversells.
+      const cap = (inv && inv.overrideAvailable != null) ? inv.overrideAvailable : roomType.totalRooms;
+      minAvailable = Math.min(minAvailable, cap - booked);
       dailyPrices.push({ date, price: (inv && inv.priceOverride) || roomType.basePriceDaily });
     }
     minAvailable = Math.max(0, minAvailable);
@@ -167,7 +171,11 @@ class RoomService {
       const inv = inventoryMap[date];
       const isClosed = inv ? inv.isClosed : false;
       const booked = bookedMap[date] || 0;
-      const available = Math.max(0, roomType.totalRooms - booked);
+      // Respect an admin-set manual cap (overrideAvailable) when present,
+      // otherwise fall back to the full room count. Availability stays
+      // booking-derived so it can never drift.
+      const cap = (inv && inv.overrideAvailable != null) ? inv.overrideAvailable : roomType.totalRooms;
+      const available = Math.max(0, cap - booked);
       calendar.push({
         date,
         availableCount: isClosed ? 0 : available,
@@ -180,6 +188,14 @@ class RoomService {
     }
 
     return { roomType, calendar };
+  }
+
+  // ── Invalidate cached daily availability for a room type ─────────────────
+  // Call after admin inventory changes (closures, caps, price overrides) so the
+  // guest booking flow reflects them immediately rather than after TTL expiry.
+  async invalidateAvailabilityCache(roomTypeId) {
+    const keys = await redis.keys(`avail:daily:${roomTypeId}:*`).catch(() => []);
+    if (keys.length > 0) await redis.del(...keys).catch(() => {});
   }
 
   // ── Get or create inventory record ──────────────────────────────────────

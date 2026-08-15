@@ -24,6 +24,17 @@ module.exports = (sequelize) => {
         type: DataTypes.INTEGER,
         defaultValue: 0,
       },
+      // Admin-set manual cap on how many rooms may be sold for this date.
+      // When null (the default), availability is derived purely from
+      // totalRooms − active bookings. When set, effective availability is
+      // capped at (overrideAvailable − active bookings). This lets the admin
+      // "Available Count" bulk control restrict stock without disturbing the
+      // live booking-derived availability model.
+      overrideAvailable: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+      },
       priceOverride: {
         type: DataTypes.FLOAT,
         allowNull: true,

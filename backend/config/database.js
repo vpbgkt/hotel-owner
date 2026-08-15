@@ -135,6 +135,7 @@ async function ensureColumns() {
     { table: 'RoomTypes', column: 'maxChildren', type: 'INTEGER DEFAULT 0' },
     { table: 'Bookings', column: 'numAdults', type: 'INTEGER DEFAULT 1' },
     { table: 'Bookings', column: 'numChildren', type: 'INTEGER DEFAULT 0' },
+    { table: 'RoomInventories', column: 'overrideAvailable', type: 'INTEGER' },
   ];
   for (const c of columns) {
     try {
