@@ -70,8 +70,8 @@ export default function Navbar() {
     <nav
       className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
         solid
-          ? 'bg-white/95 backdrop-blur border-b border-gray-100 shadow-sm'
-          : 'bg-transparent'
+          ? 'bg-white/95 backdrop-blur shadow-sm border-b border-gray-100'
+          : 'bg-transparent border-b border-transparent'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 md:h-20 flex items-center justify-between">
@@ -120,26 +120,29 @@ export default function Navbar() {
                 <ChevronDown className={`w-4 h-4 transition-transform ${dropOpen ? 'rotate-180' : ''}`} />
               </button>
               {dropOpen && (
-                <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-50">
-                  <div className="px-4 py-2.5 border-b border-gray-100">
+                <div className="absolute right-0 top-full mt-3 w-56 bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 py-2 z-50 animate-fade-in">
+                  <div className="px-4 py-3 border-b border-gray-100">
                     <p className="text-sm font-semibold text-gray-900 truncate">{user?.name}</p>
-                    <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                    <p className="text-xs text-gray-400 truncate mt-0.5">{user?.email}</p>
                   </div>
-                  <Link href="/user/profile" onClick={() => setDropOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50">
-                    <User className="w-4 h-4 text-primary-600" /> Profile
-                  </Link>
-                  <Link href="/bookings" onClick={() => setDropOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50">
-                    <CalendarCheck className="w-4 h-4 text-primary-600" /> My Booking
-                  </Link>
-                  {user?.role === 'HOTEL_ADMIN' && (
-                    <Link href="/admin" onClick={() => setDropOpen(false)} className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-primary-50">
-                      <ShieldCheck className="w-4 h-4 text-primary-600" /> Admin
+                  <div className="py-1">
+                    <Link href="/user/profile" onClick={() => setDropOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-lg mx-1.5 transition-colors">
+                      <User className="w-4 h-4 text-gray-400" /> Profile
                     </Link>
-                  )}
-                  <div className="border-t border-gray-100 mt-1 pt-1">
+                    <Link href="/bookings" onClick={() => setDropOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-lg mx-1.5 transition-colors">
+                      <CalendarCheck className="w-4 h-4 text-gray-400" /> My Booking
+                    </Link>
+                    {user?.role === 'HOTEL_ADMIN' && (
+                      <Link href="/admin" onClick={() => setDropOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-lg mx-1.5 transition-colors">
+                        <ShieldCheck className="w-4 h-4 text-gray-400" /> Admin
+                      </Link>
+                    )}
+                  </div>
+                  <div className="border-t border-gray-100 pt-1 mt-1">
                     <button
                       onClick={() => { setDropOpen(false); logout(); }}
-                      className="flex items-center gap-2.5 w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      className="flex items-center gap-3 w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-lg mx-1.5 transition-colors"
+                      style={{ width: 'calc(100% - 12px)' }}
                     >
                       <LogOut className="w-4 h-4" /> Sign out
                     </button>
