@@ -11,7 +11,7 @@ import toast from 'react-hot-toast';
 // ── Daily booking form ──────────────────────────────────────────────────────
 function DailyBookingForm({ hotel, selectedRT, selectedRoomType }) {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [availability, setAvailability] = useState(null);
   const [checking, setChecking] = useState(false);
   const [booking, setBooking] = useState(false);
@@ -51,6 +51,7 @@ function DailyBookingForm({ hotel, selectedRT, selectedRoomType }) {
 
   const onBook = async (data) => {
     if (!isAuthenticated) { toast.error('Please sign in to book'); router.push('/auth/login'); return; }
+    if (!user?.emailVerified) { toast.error('Please verify your email before booking'); return; }
     setBooking(true);
     try {
       const adults = parseInt(data.numAdults);
@@ -151,7 +152,7 @@ function DailyBookingForm({ hotel, selectedRT, selectedRoomType }) {
 // ── Hourly booking form ─────────────────────────────────────────────────────
 function HourlyBookingForm({ hotel, selectedRT, selectedRoomType }) {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [slots, setSlots] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [numHours, setNumHours] = useState(1);
@@ -177,6 +178,7 @@ function HourlyBookingForm({ hotel, selectedRT, selectedRoomType }) {
 
   const onBook = async () => {
     if (!isAuthenticated) { toast.error('Please sign in to book'); router.push('/auth/login'); return; }
+    if (!user?.emailVerified) { toast.error('Please verify your email before booking'); return; }
     if (!selectedSlot) { toast.error('Please select a time slot'); return; }
     if (!guestInfo.name || !guestInfo.phone) { toast.error('Name and phone are required'); return; }
     setBooking(true);
@@ -259,8 +261,10 @@ function HourlyBookingForm({ hotel, selectedRT, selectedRoomType }) {
 
 // ── Main Widget ─────────────────────────────────────────────────────────────
 export default function BookingWidget({ hotel, roomTypes }) {
+  const { isAuthenticated, user } = useAuth();
   const [selectedRoomType, setSelectedRoomType] = useState(roomTypes[0]?.id || '');
   const [bookTab, setBookTab] = useState('daily');
+  const needsEmailVerification = isAuthenticated && !user?.emailVerified;
 
   const selectedRT = roomTypes.find((rt) => String(rt.id) === String(selectedRoomType));
   const bookingModel = selectedRT?.bookingModelOverride || hotel?.bookingModel || 'DAILY';
@@ -276,6 +280,12 @@ export default function BookingWidget({ hotel, roomTypes }) {
         <h3 className="font-display text-xl font-semibold text-gray-900">Book Your Stay</h3>
         <span className="text-xs uppercase tracking-widest text-primary-600 font-semibold">Best Rate</span>
       </div>
+
+      {needsEmailVerification && (
+        <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+          Please verify your email before booking. Check your inbox for the verification link.
+        </div>
+      )}
 
       {/* Room Type Selector */}
       {roomTypes.length > 1 && (

@@ -21,7 +21,7 @@ function getTransporter() {
 class NotificationService {
   async sendEmail(to, subject, htmlContent) {
     if (!env.SMTP_USER) {
-      console.log(`[Email] Dev mode — would send to ${to}: ${subject}`);
+      console.log(`[Email] Dev mode — would send to ${to}: ${subject}\n${htmlContent}`);
       return;
     }
     try {
@@ -32,7 +32,13 @@ class NotificationService {
         html: htmlContent,
       });
     } catch (err) {
-      console.error(`[Email] Failed to send to ${to}:`, err.message);
+      // SMTP send failed (e.g. placeholder/misconfigured credentials). Log the
+      // full content as a fallback so links/tokens (password reset, email
+      // verification) are never silently lost — this error is intentionally
+      // NOT rethrown so the caller's own try/catch dev-fallback logging (which
+      // never fires here since no exception propagates) isn't relied upon.
+      console.error(`[Email] Failed to send to ${to}: ${err.message}`);
+      console.log(`[Email] Fallback content for ${to}: ${subject}\n${htmlContent}`);
     }
   }
 
@@ -92,6 +98,17 @@ class NotificationService {
       <p>Hi ${name || 'there'},</p>
       <p>Click to verify your email address:</p>
       <a href="${verifyUrl}">${verifyUrl}</a>
+    `;
+    await this.sendEmail(userEmail, subject, html);
+  }
+
+  async sendRegistrationEmail(userEmail, token) {
+    const subject = 'Verify Your Email to Create Your Account';
+    const completeUrl = `${env.FRONTEND_URL}/auth/register/complete?token=${token}`;
+    const html = `
+      <h2>Welcome!</h2>
+      <p>Thanks for signing up. Click the link below to verify your email and finish creating your account. This link expires in 24 hours.</p>
+      <a href="${completeUrl}">${completeUrl}</a>
     `;
     await this.sendEmail(userEmail, subject, html);
   }

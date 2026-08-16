@@ -32,7 +32,4 @@ exports.getMyReviews = asyncHandler(async (req, res) => {
   return success(res, 'Reviews fetched', data);
 });
 
-exports.deactivate = asyncHandler(async (req, res) => {
-  const data = await userService.deactivateAccount(req.user.id);
-  return success(res, data.message, null);
-});
+

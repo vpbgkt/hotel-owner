@@ -14,6 +14,10 @@ export const authApi = {
   resetPassword: (data) => executeApi.post('/auth/password/reset', data),
   verifyEmail: (token) => executeApi.post('/auth/email/verify', { token }),
   resendVerification: () => executeApi.post('/auth/email/resend-verification'),
+  // Verified (two-step) registration
+  requestRegistration: (email) => executeApi.post('/auth/register/request', { email }),
+  verifyRegistrationToken: (token) => executeApi.get('/auth/register/verify', { params: { token } }),
+  completeRegistration: (data) => executeApi.post('/auth/register/complete', data),
 };
 
 // ── Hotels ────────────────────────────────────────────────────────────────────
@@ -117,7 +121,6 @@ export const userApi = {
   updateProfile: (data) => executeApi.put('/user/profile', data),
   getMyBookings: (params) => executeApi.get('/user/bookings', { params }),
   getMyReviews: (params) => executeApi.get('/user/reviews', { params }),
-  deactivate: () => executeApi.delete('/user/account'),
 };
 
 // ── Pricing ───────────────────────────────────────────────────────────────────

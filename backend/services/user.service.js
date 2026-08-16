@@ -27,8 +27,16 @@ class UserService {
 
     const updates = {};
     if (name !== undefined) updates.name = name;
-    if (email !== undefined) { updates.email = email; updates.emailVerified = false; }
-    if (phone !== undefined) { updates.phone = phone; updates.phoneVerified = false; }
+    // Only reset the verified flag when the value actually changes — saving
+    // the form with the same email/phone should not re-flag it as unverified.
+    if (email !== undefined) {
+      updates.email = email;
+      if (email !== user.email) updates.emailVerified = false;
+    }
+    if (phone !== undefined) {
+      updates.phone = phone;
+      if (phone !== user.phone) updates.phoneVerified = false;
+    }
     if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
 
     await user.update(updates);
@@ -61,12 +69,6 @@ class UserService {
     );
   }
 
-  async deactivateAccount(userId) {
-    const user = await User.findByPk(userId);
-    if (!user) throw createError('User not found', 404);
-    await user.update({ isActive: false });
-    return { message: 'Account deactivated successfully' };
-  }
 }
 
 module.exports = new UserService();

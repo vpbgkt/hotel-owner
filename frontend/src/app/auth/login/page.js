@@ -7,13 +7,14 @@ import { useForm } from 'react-hook-form';
 import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
 import AuthCard from '@/components/auth/AuthCard';
-import { KeyRound } from 'lucide-react';
+import { KeyRound, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState('email'); // 'email' | 'phone'
+  const [showPassword, setShowPassword] = useState(false);
 
   const { register, handleSubmit, setError, formState: { errors } } = useForm();
 
@@ -61,7 +62,12 @@ export default function LoginPage() {
             </div>
             <div>
               <label className="label">Password</label>
-              <input type="password" className="input" placeholder="••••••••" {...register('password', { required: 'Password is required' })} />
+              <div className="relative">
+                <input type={showPassword ? 'text' : 'password'} className="input pr-10" placeholder="••••••••" {...register('password', { required: 'Password is required' })} />
+                <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" tabIndex={-1} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               {errors.password && <p className="error-message">{errors.password.message}</p>}
             </div>
             <div className="text-right">
@@ -77,7 +83,12 @@ export default function LoginPage() {
             </div>
             <div>
               <label className="label">Password (if set)</label>
-              <input type="password" className="input" placeholder="Leave blank to use OTP" {...register('password')} />
+              <div className="relative">
+                <input type={showPassword ? 'text' : 'password'} className="input pr-10" placeholder="Leave blank to use OTP" {...register('password')} />
+                <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600" tabIndex={-1} aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <p className="text-xs text-gray-500">Or <Link href="/auth/otp" className="text-primary-600 underline">sign in with OTP</Link></p>
           </>

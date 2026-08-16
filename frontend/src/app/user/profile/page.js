@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import Reveal from '@/components/ui/Reveal';
-import { User, Mail, Phone, AlertTriangle } from 'lucide-react';
+import { User, Mail, Phone } from 'lucide-react';
 
 export default function ProfilePage() {
   const { user, loading, isAuthenticated, updateUser } = useAuth();
@@ -21,13 +21,15 @@ export default function ProfilePage() {
   }, [loading, isAuthenticated, router]);
 
   useEffect(() => {
-    if (user) reset({ name: user.name, email: user.email || '', phone: user.phone || '' });
+    if (user) reset({ name: user.name, phone: user.phone || '' });
   }, [user, reset]);
 
   const onSubmit = async (data) => {
     setSaving(true);
     try {
-      const res = await userApi.updateProfile(data);
+      // Email is intentionally omitted — it is the verified account identity and
+      // is set once during registration, so it cannot be changed here.
+      const res = await userApi.updateProfile({ name: data.name, phone: data.phone });
       updateUser(res.data.data);
       toast.success('Profile updated');
     } catch (err) {
@@ -63,10 +65,8 @@ export default function ProfilePage() {
               </div>
               <div>
                 <label className="label flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-gray-400" /> Email</label>
-                <input type="email" className="input" {...register('email')} />
-                {user.email && !user.emailVerified && (
-                  <p className="text-xs text-amber-600 mt-1">Email not verified</p>
-                )}
+                <input type="email" className="input bg-gray-50 text-gray-500 cursor-not-allowed" value={user.email || ''} disabled readOnly />
+                <p className="text-xs text-gray-400 mt-1">Your verified email can&apos;t be changed.</p>
               </div>
               <div>
                 <label className="label flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-gray-400" /> Phone</label>
@@ -78,27 +78,6 @@ export default function ProfilePage() {
               </button>
             </form>
           </div>
-        </Reveal>
-
-        <Reveal delay={100} className="mt-8 p-6 sm:p-7 bg-red-50 rounded-2xl border border-red-100">
-          <h3 className="font-semibold text-red-800 mb-1.5 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4" /> Danger Zone
-          </h3>
-          <p className="text-sm text-red-600 mb-4">Deactivating your account is permanent and cannot be undone.</p>
-          <button
-            onClick={() => {
-              if (confirm('Are you sure? This will deactivate your account.')) {
-                userApi.deactivate().then(() => {
-                  localStorage.removeItem('accessToken');
-                  localStorage.removeItem('refreshToken');
-                  router.push('/');
-                }).catch(() => toast.error('Failed to deactivate account'));
-              }
-            }}
-            className="text-sm px-4 py-2.5 border border-red-200 text-red-700 rounded-full hover:bg-red-100 transition-colors font-medium"
-          >
-            Deactivate Account
-          </button>
         </Reveal>
       </div>
     </main>
