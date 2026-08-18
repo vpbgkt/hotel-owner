@@ -12,6 +12,8 @@ const createDailyBooking = [
     .notEmpty().withMessage('Check-out date required')
     .isDate({ format: 'YYYY-MM-DD' }).withMessage('Check-out date must be YYYY-MM-DD'),
   body('numRooms').optional().isInt({ min: 1, max: 10 }).withMessage('numRooms must be 1-10'),
+  body('numAdults').optional().isInt({ min: 1 }).withMessage('numAdults must be at least 1'),
+  body('numChildren').optional().isInt({ min: 0 }).withMessage('numChildren must be >= 0'),
   body('numGuests').optional().isInt({ min: 1 }).withMessage('numGuests must be at least 1'),
   body('numExtraGuests').optional().isInt({ min: 0 }).withMessage('numExtraGuests must be >= 0'),
   body('guestName').notEmpty().isLength({ max: 255 }).withMessage('Guest name required'),

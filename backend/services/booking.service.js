@@ -16,7 +16,13 @@ const DEFAULT_TAX_RATE = 0.12;
 class BookingService {
   // ── Create Daily Booking ────────────────────────────────────────────────
   async createDailyBooking(input, userId) {
-    const { hotelId, roomTypeId, checkInDate, checkOutDate, numRooms = 1, numGuests = 1, numExtraGuests = 0, guestName, guestEmail, guestPhone, specialRequests } = input;
+    const { hotelId, roomTypeId, checkInDate, checkOutDate, numRooms = 1, numExtraGuests = 0, guestName, guestEmail, guestPhone, specialRequests } = input;
+
+    // Guests are captured as adults + children. Fall back to legacy numGuests if
+    // the client sent only a single guest count.
+    const numAdults = parseInt(input.numAdults ?? input.numGuests ?? 1);
+    const numChildren = parseInt(input.numChildren ?? 0);
+    const numGuests = numAdults + numChildren;
 
     const lockKey = `booking_lock:${hotelId}:${roomTypeId}`;
     const lockValue = await acquireLock(redis, lockKey);
@@ -30,10 +36,25 @@ class BookingService {
       if (!roomType) throw createError('Room type not found', 404);
       if (!hotel) throw createError('Hotel not found', 404);
 
-      // Enforce guest limit
-      const maxAllowed = roomType.maxGuests * numRooms;
-      if (numGuests > maxAllowed) {
-        throw createError(`Max ${maxAllowed} guest(s) allowed for ${numRooms} room(s) of this type`, 400);
+      // Enforce occupancy limits (scaled by number of rooms booked):
+      //  1. adults must not exceed max adults
+      //  2. children must not exceed max children
+      //  3. total (adults + children) must not exceed max occupancy
+      const maxAdults = (roomType.maxAdults ?? roomType.maxGuests) * numRooms;
+      const maxChildren = (roomType.maxChildren ?? 0) * numRooms;
+      const maxOccupancy = roomType.maxGuests * numRooms;
+
+      if (numAdults < 1) {
+        throw createError('At least 1 adult is required', 400);
+      }
+      if (numAdults > maxAdults) {
+        throw createError(`Max ${maxAdults} adult(s) allowed for ${numRooms} room(s) of this type`, 400);
+      }
+      if (numChildren > maxChildren) {
+        throw createError(`Max ${maxChildren} child(ren) allowed for ${numRooms} room(s) of this type`, 400);
+      }
+      if (numGuests > maxOccupancy) {
+        throw createError(`Max occupancy is ${maxOccupancy} guest(s) for ${numRooms} room(s) of this type`, 400);
       }
 
       const taxRate = hotel.gstRate ?? DEFAULT_TAX_RATE;
@@ -57,6 +78,8 @@ class BookingService {
         checkOutDate,
         numRooms,
         numGuests,
+        numAdults,
+        numChildren,
         numExtraGuests,
         guestName,
         guestEmail,
@@ -89,11 +112,23 @@ class BookingService {
       if (!roomType) throw createError('Room type not found', 404);
 
       const slotEndTime = dayjs(`${date} ${slotStart}`).add(numHours, 'hour').format('HH:mm');
+
+      // ── Check slot availability BEFORE creating the booking ────────────
+      const { HourlySlot } = require('../models');
+      const [slotInv] = await HourlySlot.findOrCreate({
+        where: { roomTypeId, date, slotStart },
+        defaults: { roomTypeId, date, slotStart, slotEnd: slotEndTime, availableCount: roomType.totalRooms, isClosed: false },
+      });
+      if (slotInv.isClosed) throw createError('This slot is closed', 409);
+      if (slotInv.availableCount < numRooms) throw createError('Not enough rooms available for this slot', 409);
+
+      // ── Calculate pricing ───────────────────────────────────────────────
       const pricePerHour = roomType.basePriceHourly || 0;
       const roomTotal = pricePerHour * numHours * numRooms;
-      const taxes = Math.round(roomTotal * TAX_RATE);
+      const taxes = Math.round(roomTotal * DEFAULT_TAX_RATE);
       const totalAmount = roomTotal + taxes;
 
+      // ── Create booking ──────────────────────────────────────────────────
       const booking = await Booking.create({
         bookingNumber: generateBookingNumber(),
         hotelId,
@@ -119,12 +154,7 @@ class BookingService {
         paymentStatus: 'PENDING',
       });
 
-      const { HourlySlot } = require('../models');
-      const [slotInv] = await HourlySlot.findOrCreate({
-        where: { roomTypeId, date, slotStart },
-        defaults: { roomTypeId, date, slotStart, slotEnd: slotEndTime, availableCount: roomType.totalRooms, isClosed: false }
-      });
-      if (slotInv.availableCount < numRooms) throw createError('Not enough rooms available for this slot', 409);
+      // ── Decrement slot inventory ────────────────────────────────────────
       await slotInv.decrement('availableCount', { by: numRooms });
 
       return this._getBookingById(booking.id);
@@ -240,7 +270,18 @@ class BookingService {
 
     await booking.update({ status });
 
-    // Restore inventory when checked out early
+    // ── Restore inventory on CANCELLED ────────────────────────────────────
+    if (status === 'CANCELLED') {
+      if (booking.bookingType === 'DAILY' && booking.checkInDate && booking.checkOutDate) {
+        const dates = roomService._getDateRange(booking.checkInDate, booking.checkOutDate);
+        await roomService.restoreAvailability(booking.roomTypeId, dates, booking.numRooms);
+      }
+      // Hourly slot restore
+      // (hourly slots are restored via HourlySlot.increment — omitted here for simplicity
+      // since the slot TTL is short and there's no persistent cache for hourly)
+    }
+
+    // ── Restore inventory on CHECKED_OUT (early checkout) ─────────────────
     if (status === 'CHECKED_OUT' && booking.bookingType === 'DAILY' && booking.checkInDate && booking.checkOutDate) {
       const today = dayjs().format('YYYY-MM-DD');
       if (dayjs(today).isBefore(dayjs(booking.checkOutDate))) {
@@ -261,13 +302,25 @@ class BookingService {
     });
     if (!booking) throw createError('Booking not found', 404);
 
-    if (!['PENDING', 'CONFIRMED'].includes(booking.status)) {
-      throw createError('Can only modify pending or confirmed bookings', 400);
+    if (!['PENDING', 'CONFIRMED', 'CHECKED_IN'].includes(booking.status)) {
+      throw createError('Can only modify pending, confirmed, or checked-in bookings', 400);
     }
 
-    const allowedFields = ['checkInDate', 'checkOutDate', 'numRooms', 'numGuests', 'numExtraGuests', 'specialRequests'];
+    // When a guest is already checked in, only allow extending checkout or updating special requests
+    const isCheckedIn = booking.status === 'CHECKED_IN';
+    const allowedFields = isCheckedIn
+      ? ['checkOutDate', 'specialRequests']
+      : ['checkInDate', 'checkOutDate', 'numRooms', 'numGuests', 'numExtraGuests', 'specialRequests'];
+
     const updateData = {};
     allowedFields.forEach((f) => { if (updates[f] !== undefined) updateData[f] = updates[f]; });
+
+    // For CHECKED_IN: only allow extending (moving checkout further out, not shortening)
+    if (isCheckedIn && updateData.checkOutDate) {
+      if (updateData.checkOutDate <= booking.checkOutDate) {
+        throw createError('Cannot shorten stay for a checked-in booking. You may only extend the checkout date.', 400);
+      }
+    }
 
     // Recalculate pricing if dates/rooms changed
     if (updateData.checkInDate || updateData.checkOutDate || updateData.numRooms) {

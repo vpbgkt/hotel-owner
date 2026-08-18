@@ -33,7 +33,11 @@ function isPgAvailable() {
 }
 
 // ── Choose DB backend at load time ───────────────────────────────────────────
-const pgAvailable = isPgAvailable();
+// DB_FORCE_POSTGRES=true forces PostgreSQL exclusively (no SQLite / pg-mem
+// fallback) even in development. If Postgres is unreachable the app fails to
+// start instead of silently switching to SQLite.
+const forcePostgres = process.env.DB_FORCE_POSTGRES === 'true';
+const pgAvailable = forcePostgres || isPgAvailable();
 
 let sequelize;
 let usingMemDb = false;
@@ -124,6 +128,33 @@ if (pgAvailable) {
   }
 }
 
+// ── ensureColumns — additive schema migration ────────────────────────────────
+// sync({ force: false }) creates missing tables but never ALTERs existing ones,
+// so newly-added model columns must be added manually. This runs idempotently on
+// every startup and is safe for SQLite and PostgreSQL (duplicate-column errors
+// are swallowed). Double-quoted identifiers work on both dialects.
+async function ensureColumns() {
+  const columns = [
+    { table: 'RoomTypes', column: 'maxAdults', type: 'INTEGER DEFAULT 2' },
+    { table: 'RoomTypes', column: 'maxChildren', type: 'INTEGER DEFAULT 0' },
+    { table: 'Bookings', column: 'numAdults', type: 'INTEGER DEFAULT 1' },
+    { table: 'Bookings', column: 'numChildren', type: 'INTEGER DEFAULT 0' },
+    { table: 'RoomInventories', column: 'overrideAvailable', type: 'INTEGER' },
+  ];
+  for (const c of columns) {
+    try {
+      await sequelize.query(`ALTER TABLE "${c.table}" ADD COLUMN "${c.column}" ${c.type}`);
+      console.log(`[DB] Added column ${c.table}.${c.column}`);
+    } catch (e) {
+      const msg = (e.message || '').toLowerCase();
+      if (!msg.includes('duplicate') && !msg.includes('already exists')) {
+        console.warn(`[DB] ensureColumns ${c.table}.${c.column}: ${e.message}`);
+      }
+      // else: column already exists — nothing to do
+    }
+  }
+}
+
 // ── connectDatabase — called in bootstrap() ──────────────────────────────────
 async function connectDatabase() {
   await sequelize.authenticate();
@@ -132,12 +163,14 @@ async function connectDatabase() {
     console.log('[DB] pg-mem authenticated — syncing tables...');
     await sequelize.sync({ force: true });
     console.log('[DB] Tables created in pg-mem');
+    await ensureColumns();
     await _seedDevDb();
   } else if (usingSqlite) {
     console.log('[DB] SQLite authenticated — syncing schema...');
     // Never use alter on SQLite — it creates _old shadow tables with stale FK triggers.
     // force:false just creates missing tables without touching existing ones.
     await sequelize.sync({ force: false });
+    await ensureColumns();
     console.log('[DB] SQLite schema up-to-date');
     // Seed if Hotel OR RoomType tables are empty
     const models = require('../models');
@@ -151,6 +184,23 @@ async function connectDatabase() {
     }
   } else {
     console.log('[DB] PostgreSQL connected successfully');
+    // Create any missing tables (safe: sync() without force/alter never drops
+    // data). This project has no migration files, so sync is how the schema is
+    // materialized. ensureColumns then adds any newly-introduced columns.
+    await sequelize.sync();
+    await ensureColumns();
+    // Seed demo data in non-production if the DB is empty.
+    if (env.NODE_ENV !== 'production') {
+      const models = require('../models');
+      const hotelCount = await models.Hotel.count().catch(() => 0);
+      const roomTypeCount = await models.RoomType.count().catch(() => 0);
+      if (hotelCount === 0 || roomTypeCount === 0) {
+        console.log('[DB] PostgreSQL missing data — seeding demo data...');
+        await _seedDevDb();
+      } else {
+        console.log(`[DB] PostgreSQL has ${hotelCount} hotel(s), ${roomTypeCount} room type(s) — skipping seed`);
+      }
+    }
   }
 }
 
@@ -219,69 +269,55 @@ async function _seedDevDb() {
       isActive: true, emailVerified: true, phoneVerified: true,
     });
 
-    // ── Room Types ──────────────────────────────────────────────────────────
-    // Use raw SQL to bypass Sequelize unique-constraint issues with SQLite sync
-    const RT_DELUXE_ID   = 1;
-    const RT_SUPERIOR_ID = 2;
-    const RT_SUITE_ID    = 3;
-    const RT_PRES_ID     = 4;
-    const nowISO = new Date().toISOString();
-
+    // ── Room Types + Inventory ────────────────────────────────────────────
+    // Model-based seeding (dialect-agnostic — works on PostgreSQL and SQLite).
+    // amenities/images are passed as real arrays so PostgreSQL ARRAY columns and
+    // the SQLite JSON fallback both store them correctly. IDs are left to the
+    // DB (auto-increment) rather than hardcoded, avoiding Postgres sequence
+    // conflicts. maxGuests = adults + children (as in the original seed).
+    const dayjs = require('dayjs');
     const rtRows = [
-      { id: RT_DELUXE_ID, name: 'Deluxe Room', slug: 'deluxe-room',
-        desc: 'Elegant 32 sqm room with a plush king-size bed, city views, rain shower, and complimentary high-speed Wi-Fi.',
-        price: 3500, hourly: 500, guests: 2, extra: 1, charge: 700, rooms: 20, sort: 1,
-        amenities: JSON.stringify(['King Bed','Free WiFi','AC','55" Smart TV','Mini Fridge','Tea/Coffee Maker','Rain Shower','City View','Daily Housekeeping','Room Service']),
-        images: JSON.stringify(['https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&q=80','https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800&q=80','https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&q=80']),
-      },
-      { id: RT_SUPERIOR_ID, name: 'Superior Room', slug: 'superior-room',
-        desc: 'Spacious 42 sqm Superior Room featuring a living area, work desk, premium bedding, and stunning panoramic city views.',
-        price: 5500, hourly: 800, guests: 2, extra: 2, charge: 900, rooms: 15, sort: 2,
-        amenities: JSON.stringify(['King Bed','Free WiFi','AC','65" Smart TV','Mini Bar','Sofa Area','Bathtub + Shower','City View','Welcome Drink','Daily Housekeeping','Room Service']),
-        images: JSON.stringify(['https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800&q=80','https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&q=80','https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=800&q=80']),
-      },
-      { id: RT_SUITE_ID, name: 'Executive Suite', slug: 'executive-suite',
-        desc: 'Our 75 sqm Executive Suite offers a separate bedroom and living room, private jacuzzi, walk-in wardrobe, and dedicated butler service.',
-        price: 9500, hourly: 1500, guests: 3, extra: 2, charge: 1200, rooms: 8, sort: 3,
-        amenities: JSON.stringify(['Super King Bed','Free WiFi','AC','75" Smart TV','Full Mini Bar','Jacuzzi','Separate Living Room','Balcony','Butler Service','Airport Transfer','Complimentary Breakfast']),
-        images: JSON.stringify(['https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80','https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&q=80','https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800&q=80']),
-      },
-      { id: RT_PRES_ID, name: 'Presidential Suite', slug: 'presidential-suite',
-        desc: 'The crown jewel of Grand Horizon. 150 sqm with two bedrooms, private dining room, rooftop terrace, personal chef, and panoramic views.',
-        price: 22000, hourly: 3500, guests: 4, extra: 2, charge: 2000, rooms: 2, sort: 4,
-        amenities: JSON.stringify(['2 Bedrooms','Private Terrace','Private Pool','Personal Chef','Dedicated Butler','Luxury Spa Access','Private Dining Room','Home Theater','Limousine Service','Complimentary All Meals']),
-        images: JSON.stringify(['https://images.unsplash.com/photo-1615460549969-36fa19521a4f?w=800&q=80','https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80','https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=800&q=80']),
-      },
+      { slug: 'deluxe-room', name: 'Deluxe Room',
+        description: 'Elegant 32 sqm room with a plush king-size bed, city views, rain shower, and complimentary high-speed Wi-Fi.',
+        basePriceDaily: 3500, basePriceHourly: 500, maxGuests: 3, maxAdults: 2, maxChildren: 1, maxExtraGuests: 1, extraGuestCharge: 700, totalRooms: 20, sortOrder: 1,
+        amenities: ['King Bed','Free WiFi','AC','55" Smart TV','Mini Fridge','Tea/Coffee Maker','Rain Shower','City View','Daily Housekeeping','Room Service'],
+        images: ['https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&q=80','https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800&q=80','https://images.unsplash.com/photo-1590490360182-c33d57733427?w=800&q=80'] },
+      { slug: 'superior-room', name: 'Superior Room',
+        description: 'Spacious 42 sqm Superior Room featuring a living area, work desk, premium bedding, and stunning panoramic city views.',
+        basePriceDaily: 5500, basePriceHourly: 800, maxGuests: 4, maxAdults: 2, maxChildren: 2, maxExtraGuests: 2, extraGuestCharge: 900, totalRooms: 15, sortOrder: 2,
+        amenities: ['King Bed','Free WiFi','AC','65" Smart TV','Mini Bar','Sofa Area','Bathtub + Shower','City View','Welcome Drink','Daily Housekeeping','Room Service'],
+        images: ['https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800&q=80','https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&q=80','https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=800&q=80'] },
+      { slug: 'executive-suite', name: 'Executive Suite',
+        description: 'Our 75 sqm Executive Suite offers a separate bedroom and living room, private jacuzzi, walk-in wardrobe, and dedicated butler service.',
+        basePriceDaily: 9500, basePriceHourly: 1500, maxGuests: 5, maxAdults: 3, maxChildren: 2, maxExtraGuests: 2, extraGuestCharge: 1200, totalRooms: 8, sortOrder: 3,
+        amenities: ['Super King Bed','Free WiFi','AC','75" Smart TV','Full Mini Bar','Jacuzzi','Separate Living Room','Balcony','Butler Service','Airport Transfer','Complimentary Breakfast'],
+        images: ['https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80','https://images.unsplash.com/photo-1571896349842-33c89424de2d?w=800&q=80','https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800&q=80'] },
+      { slug: 'presidential-suite', name: 'Presidential Suite',
+        description: 'The crown jewel of Grand Horizon. 150 sqm with two bedrooms, private dining room, rooftop terrace, personal chef, and panoramic views.',
+        basePriceDaily: 22000, basePriceHourly: 3500, maxGuests: 6, maxAdults: 4, maxChildren: 2, maxExtraGuests: 2, extraGuestCharge: 2000, totalRooms: 2, sortOrder: 4,
+        amenities: ['2 Bedrooms','Private Terrace','Private Pool','Personal Chef','Dedicated Butler','Luxury Spa Access','Private Dining Room','Home Theater','Limousine Service','Complimentary All Meals'],
+        images: ['https://images.unsplash.com/photo-1615460549969-36fa19521a4f?w=800&q=80','https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&q=80','https://images.unsplash.com/photo-1566665797739-1674de7a421a?w=800&q=80'] },
     ];
 
     for (const rt of rtRows) {
-      await sequelize.query(
-        `INSERT OR IGNORE INTO RoomTypes
-          (id,hotelId,name,slug,description,basePriceDaily,basePriceHourly,maxGuests,maxExtraGuests,extraGuestCharge,totalRooms,sortOrder,amenities,images,isActive,createdAt,updatedAt)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)`,
-        { replacements: [rt.id, HOTEL_ID, rt.name, rt.slug, rt.desc, rt.price, rt.hourly, rt.guests, rt.extra, rt.charge, rt.rooms, rt.sort, rt.amenities, rt.images, nowISO, nowISO] }
-      );
-    }
+      // findOne + create (not findOrCreate) keeps parity with the upsert helper
+      // and stays compatible with the pg-mem fallback.
+      let roomType = await models.RoomType.findOne({ where: { hotelId: HOTEL_ID, slug: rt.slug } });
+      if (!roomType) {
+        roomType = await models.RoomType.create({ ...rt, hotelId: HOTEL_ID, isActive: true });
+      }
 
-    // ── RoomInventory — seed next 60 days for all room types ────────────────
-    if (models.RoomInventory) {
-      const dayjs = require('dayjs');
-      const rtInventory = [
-        { id: RT_DELUXE_ID,   total: 20 },
-        { id: RT_SUPERIOR_ID, total: 15 },
-        { id: RT_SUITE_ID,    total: 8  },
-        { id: RT_PRES_ID,     total: 2  },
-      ];
-      const today = dayjs();
-      for (const rt of rtInventory) {
+      // Seed the next 60 days of inventory for this room type.
+      if (models.RoomInventory) {
+        const today = dayjs();
         for (let d = 0; d < 60; d++) {
           const date = today.add(d, 'day').format('YYYY-MM-DD');
-          const existing = await models.RoomInventory.findOne({ where: { roomTypeId: rt.id, date } });
+          const existing = await models.RoomInventory.findOne({ where: { roomTypeId: roomType.id, date } });
           if (!existing) {
             await models.RoomInventory.create({
-              roomTypeId: rt.id,
+              roomTypeId: roomType.id,
               date,
-              availableCount: rt.total,
+              availableCount: roomType.totalRooms,
               isClosed: false,
             });
           }

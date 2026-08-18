@@ -7,6 +7,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
+import Reveal from '@/components/ui/Reveal';
+import { ArrowLeft, CalendarDays, Users, BedDouble, CreditCard, XCircle, CheckCircle2 } from 'lucide-react';
 
 const RAZORPAY_KEY = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '';
 
@@ -55,7 +57,6 @@ export default function BookingDetailPage() {
     setPaying(true);
     try {
       if (RAZORPAY_KEY) {
-        // Real Razorpay flow
         const loaded = await loadRazorpayScript();
         if (!loaded) throw new Error('Razorpay SDK failed to load');
 
@@ -88,13 +89,12 @@ export default function BookingDetailPage() {
               email: booking.guestEmail,
               contact: booking.guestPhone,
             },
-            theme: { color: '#6366f1' },
+            theme: { color: '#c5a880' },
           });
           rzp.on('payment.failed', (r) => reject(new Error(r.error.description)));
           rzp.open();
         });
       } else {
-        // Demo payment flow — auto-confirms immediately
         const initRes = await paymentsApi.initiate({ bookingId: booking.id, method: 'DEMO' });
         const { paymentId } = initRes.data.data;
         await paymentsApi.confirm(paymentId, {});
@@ -122,133 +122,178 @@ export default function BookingDetailPage() {
     }
   };
 
-  if (loadingBooking) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin h-8 w-8 rounded-full border-b-2 border-primary-600" /></div>;
-  if (!booking) return <div className="text-center py-20 text-gray-400">Booking not found</div>;
+  if (loadingBooking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 rounded-full border-b-2 border-primary-600" />
+      </div>
+    );
+  }
+
+  if (!booking) {
+    return (
+      <div className="text-center py-20 text-gray-400">
+        <p className="text-lg">Booking not found</p>
+      </div>
+    );
+  }
 
   const canCancel = ['PENDING', 'CONFIRMED'].includes(booking.status);
 
+  const statusConfig = {
+    PENDING: { color: 'bg-yellow-50 text-yellow-700 border-yellow-200', label: 'Pending' },
+    CONFIRMED: { color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Confirmed' },
+    CHECKED_IN: { color: 'bg-green-50 text-green-700 border-green-200', label: 'Checked In' },
+    CHECKED_OUT: { color: 'bg-gray-100 text-gray-600 border-gray-200', label: 'Checked Out' },
+    CANCELLED: { color: 'bg-red-50 text-red-700 border-red-200', label: 'Cancelled' },
+    NO_SHOW: { color: 'bg-orange-50 text-orange-700 border-orange-200', label: 'No Show' },
+  };
+  const status = statusConfig[booking.status] || statusConfig.PENDING;
+
   return (
-    <main className="max-w-2xl mx-auto px-4 py-8">
-      <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => router.back()} className="text-gray-500 hover:text-gray-700">← Back</button>
-        <h1 className="text-2xl font-bold text-gray-900">Booking Details</h1>
-      </div>
+    <main className="bg-white min-h-[70vh]">
+      <div className="max-w-3xl mx-auto px-5 sm:px-8 py-10 lg:py-14 border border-gray-100 my-5 rounded-lg">
+        {/* Back button */}
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-2 text-sm text-gray-500 hover:text-primary-700 transition-colors mb-8"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to My Bookings
+        </button>
 
-      <div className="card p-6 space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-start">
-          <div>
-            <p className="font-mono text-sm text-gray-500">{booking.bookingNumber}</p>
-            <h2 className="text-xl font-semibold mt-1">{booking.hotel?.name}</h2>
-            <p className="text-gray-500 text-sm">{booking.roomType?.name}</p>
+        <Reveal>
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8 pb-8 border-b border-gray-100">
+            <div>
+              <p className="font-mono text-xs text-gray-400 mb-1.5">{booking.bookingNumber}</p>
+              <h1 className="font-display text-2xl md:text-3xl font-semibold text-gray-900">{booking.roomType?.name || 'Room'}</h1>
+              {booking.hotel?.name && (
+                <p className="text-gray-500 text-sm mt-1">{booking.hotel.name}</p>
+              )}
+            </div>
+            <span className={`self-start text-xs px-3 py-1.5 rounded-full font-medium border ${status.color}`}>
+              {status.label}
+            </span>
           </div>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-            booking.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-700' :
-            booking.status === 'CHECKED_IN' ? 'bg-green-100 text-green-700' :
-            booking.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-            booking.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
-            'bg-gray-100 text-gray-600'
-          }`}>{booking.status}</span>
-        </div>
+        </Reveal>
 
-        {/* Dates */}
-        <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-          <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Check-in</p>
-            <p className="font-semibold">{dayjs(booking.checkInDate).format('ddd, DD MMM YYYY')}</p>
+        {/* Stay details cards */}
+        <Reveal delay={60} className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
+          <div className="rounded-xl border border-gray-100 p-4">
+            <CalendarDays className="w-4 h-4 text-primary-600 mb-2" />
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Check-in</p>
+            <p className="font-semibold text-gray-900 text-sm">{dayjs(booking.checkInDate).format('DD MMM YYYY')}</p>
           </div>
-          <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Check-out</p>
-            <p className="font-semibold">{dayjs(booking.checkOutDate).format('ddd, DD MMM YYYY')}</p>
+          <div className="rounded-xl border border-gray-100 p-4">
+            <CalendarDays className="w-4 h-4 text-primary-600 mb-2" />
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Check-out</p>
+            <p className="font-semibold text-gray-900 text-sm">{dayjs(booking.checkOutDate).format('DD MMM YYYY')}</p>
           </div>
-          <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Guests</p>
-            <p className="font-semibold">{booking.numGuests}</p>
+          <div className="rounded-xl border border-gray-100 p-4">
+            <Users className="w-4 h-4 text-primary-600 mb-2" />
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Guests</p>
+            <p className="font-semibold text-gray-900 text-sm">
+              {booking.numAdults ?? booking.numGuests} Adult{(booking.numAdults ?? booking.numGuests) > 1 ? 's' : ''}
+              {booking.numChildren > 0 && `, ${booking.numChildren} Child`}
+            </p>
           </div>
-          <div>
-            <p className="text-xs text-gray-500 uppercase tracking-wide">Rooms</p>
-            <p className="font-semibold">{booking.numRooms}</p>
+          <div className="rounded-xl border border-gray-100 p-4">
+            <BedDouble className="w-4 h-4 text-primary-600 mb-2" />
+            <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Rooms</p>
+            <p className="font-semibold text-gray-900 text-sm">{booking.numRooms} Room{booking.numRooms > 1 ? 's' : ''}</p>
           </div>
-        </div>
+        </Reveal>
 
         {/* Guest Info */}
-        <div>
-          <h3 className="font-semibold mb-2">Guest Information</h3>
-          <div className="space-y-1 text-sm text-gray-600">
-            <p>{booking.guestName}</p>
+        <Reveal delay={100} className="mb-10">
+          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">Guest Information</h3>
+          <div className="rounded-xl border border-gray-100 p-5 space-y-2 text-sm text-gray-600">
+            <p className="font-medium text-gray-900">{booking.guestName}</p>
             {booking.guestEmail && <p>{booking.guestEmail}</p>}
             {booking.guestPhone && <p>{booking.guestPhone}</p>}
           </div>
-        </div>
+        </Reveal>
 
-        {/* Pricing */}
-        <div className="border-t pt-4">
-          <h3 className="font-semibold text-gray-900 mb-3">Price Breakdown</h3>
-          <div className="space-y-1.5">
-            <div className="flex justify-between text-sm">
+        {/* Price Breakdown */}
+        <Reveal delay={140} className="mb-10">
+          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">Price Breakdown</h3>
+          <div className="rounded-xl border border-gray-100 p-5 space-y-2.5 text-sm">
+            <div className="flex justify-between">
               <span className="text-gray-500">Room charges</span>
-              <span className="font-medium">{formatCurrency(booking.roomTotal)}</span>
+              <span className="font-medium text-gray-900">{formatCurrency(booking.roomTotal)}</span>
             </div>
             {booking.extraGuestTotal > 0 && (
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between">
                 <span className="text-gray-500">Extra guest charges</span>
-                <span className="font-medium">{formatCurrency(booking.extraGuestTotal)}</span>
+                <span className="font-medium text-gray-900">{formatCurrency(booking.extraGuestTotal)}</span>
               </div>
             )}
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between">
               <span className="text-gray-500">GST & taxes</span>
-              <span className="font-medium">{formatCurrency(booking.taxes)}</span>
+              <span className="font-medium text-gray-900">{formatCurrency(booking.taxes)}</span>
             </div>
             {booking.discountAmount > 0 && (
-              <div className="flex justify-between text-sm text-green-600">
+              <div className="flex justify-between text-green-600">
                 <span>Discount applied</span>
-                <span>−{formatCurrency(booking.discountAmount)}</span>
+                <span>-{formatCurrency(booking.discountAmount)}</span>
               </div>
             )}
-            <div className="flex justify-between font-bold text-base pt-2 mt-1 border-t border-gray-200">
-              <span>Total Paid</span>
-              <span className="text-primary-700">{formatCurrency(booking.totalAmount)}</span>
+            <div className="flex justify-between pt-3 mt-2 border-t border-gray-100">
+              <span className="font-semibold text-gray-900">Total</span>
+              <span className="font-bold text-gray-900 text-base">{formatCurrency(booking.totalAmount)}</span>
             </div>
           </div>
-          <div className={`inline-flex items-center gap-1.5 mt-3 text-xs px-2.5 py-1 rounded-full font-medium ${
-            booking.paymentStatus === 'PAID' ? 'bg-green-100 text-green-700' :
-            booking.paymentStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-            'bg-gray-100 text-gray-500'
+
+          {/* Payment status badge */}
+          <div className={`inline-flex items-center gap-1.5 mt-4 text-xs px-3 py-1.5 rounded-full font-medium border ${
+            booking.paymentStatus === 'PAID' ? 'bg-green-50 text-green-700 border-green-200' :
+            booking.paymentStatus === 'PENDING' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+            'bg-gray-100 text-gray-500 border-gray-200'
           }`}>
-            {booking.paymentStatus === 'PAID' ? '✓' : '○'} Payment: {booking.paymentStatus}
+            {booking.paymentStatus === 'PAID' ? (
+              <><CheckCircle2 className="w-3 h-3" /> Paid</>
+            ) : (
+              <><CreditCard className="w-3 h-3" /> {booking.paymentStatus}</>
+            )}
           </div>
+        </Reveal>
 
-          {/* Pay Now button */}
-          {booking.paymentStatus === 'PENDING' && booking.status !== 'CANCELLED' && (
-            <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
-              <p className="text-sm font-semibold text-yellow-800 mb-1">Payment Pending</p>
-              <p className="text-xs text-yellow-700 mb-3">
-                {RAZORPAY_KEY
-                  ? 'Complete your payment securely via Razorpay.'
-                  : 'Click below to confirm your demo payment.'}
-              </p>
-              <button
-                onClick={handlePay}
-                disabled={paying}
-                className="btn-primary w-full flex items-center justify-center gap-2"
-              >
-                {paying ? (
-                  <><span className="animate-spin h-4 w-4 rounded-full border-b-2 border-white" /> Processing…</>
-                ) : (
-                  <>{RAZORPAY_KEY ? '💳 Pay Now' : '✅ Confirm Payment (Demo)'}</>
-                )}
-              </button>
+        {/* Pay Now CTA */}
+        {booking.paymentStatus === 'PENDING' && booking.status !== 'CANCELLED' && (
+          <Reveal delay={160} className="mb-10 p-6 bg-yellow-50 border border-yellow-200 rounded-2xl">
+            <div className="flex items-start gap-3">
+              <CreditCard className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-yellow-800 mb-1">Payment Pending</p>
+                <p className="text-xs text-yellow-700 mb-4">
+                  {RAZORPAY_KEY
+                    ? 'Complete your payment securely via Razorpay.'
+                    : 'Click below to confirm your demo payment.'}
+                </p>
+                <button
+                  onClick={handlePay}
+                  disabled={paying}
+                  className="btn-primary w-full sm:w-auto"
+                >
+                  {paying ? 'Processing…' : (RAZORPAY_KEY ? 'Pay Now' : 'Confirm Payment (Demo)')}
+                </button>
+              </div>
             </div>
-          )}
-        </div>
+          </Reveal>
+        )}
 
-        {/* Actions */}
+        {/* Cancel Booking */}
         {canCancel && (
-          <div className="pt-2">
-            <button onClick={handleCancel} disabled={cancelling} className="w-full py-2 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-medium text-sm transition-colors">
+          <Reveal delay={180}>
+            <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-full border border-red-200 text-red-600 hover:bg-red-50 font-medium text-sm transition-colors"
+            >
+              <XCircle className="w-4 h-4" />
               {cancelling ? 'Cancelling…' : 'Cancel Booking'}
             </button>
-          </div>
+          </Reveal>
         )}
       </div>
     </main>

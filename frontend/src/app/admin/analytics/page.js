@@ -5,12 +5,19 @@ import { useAuth } from '@/context/AuthContext';
 import { analyticsApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
+import { DollarSign, ClipboardList, TrendingUp, RotateCcw } from 'lucide-react';
 
-function StatCard({ label, value }) {
+function StatCard({ label, value, Icon, accent = 'text-primary-600 bg-primary-50' }) {
   return (
-    <div className="card p-5">
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 flex items-start gap-4">
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${accent}`}>
+        {Icon && <Icon className="w-5 h-5" />}
+      </div>
+      <div className="min-w-0">
+        <p className="text-gray-500 text-xs uppercase tracking-wide">{label}</p>
+        <p className="text-2xl font-bold text-gray-900 mt-0.5 truncate">{value}</p>
+      </div>
     </div>
   );
 }
@@ -45,82 +52,84 @@ export default function AdminAnalyticsPage() {
   }, [isAuthenticated]);
 
   return (
-    <main className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Analytics</h1>
+    <main className="min-h-[80vh] bg-gray-50/50">
+      <AdminPageHeader title="Analytics" description="Revenue, bookings and occupancy trends" />
 
-      {loadingData ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-gray-100 animate-pulse rounded-xl" />)}
-        </div>
-      ) : (
-        <>
-          {/* Revenue summary */}
-          {revenue && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <StatCard label="Total Revenue" value={formatCurrency(revenue.totalRevenue || 0)} />
-              <StatCard label="Total Bookings" value={revenue.totalBookings || 0} />
-              <StatCard label="Avg Booking Value" value={formatCurrency(revenue.avgBookingValue || 0)} />
-              <StatCard label="Refunds" value={formatCurrency(revenue.totalRefunds || 0)} />
-            </div>
-          )}
-
-          {/* Booking trends table */}
-          <div className="card p-6 mb-6">
-            <h2 className="font-semibold text-gray-800 mb-4">Booking Trends (Last 6 Months)</h2>
-            {trends.length === 0 ? (
-              <p className="text-gray-400 text-sm">No data available</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-gray-500 border-b">
-                      <th className="pb-2">Month</th>
-                      <th className="pb-2">Bookings</th>
-                      <th className="pb-2">Revenue</th>
-                      <th className="pb-2">Cancelled</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {trends.map((t, i) => (
-                      <tr key={i}>
-                        <td className="py-2">{t.month}</td>
-                        <td className="py-2">{t.totalBookings}</td>
-                        <td className="py-2 font-medium">{formatCurrency(t.revenue || 0)}</td>
-                        <td className="py-2 text-red-500">{t.cancelledBookings || 0}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+      <div className="max-w-6xl mx-auto px-5 sm:px-8 py-8">
+        {loadingData ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            {[...Array(4)].map((_, i) => <div key={i} className="h-24 bg-gray-100 animate-pulse rounded-2xl" />)}
+          </div>
+        ) : (
+          <>
+            {/* Revenue summary */}
+            {revenue && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <StatCard label="Total Revenue" value={formatCurrency(revenue.totalRevenue || 0)} Icon={DollarSign} accent="text-emerald-600 bg-emerald-50" />
+                <StatCard label="Total Bookings" value={revenue.totalBookings || 0} Icon={ClipboardList} />
+                <StatCard label="Avg Booking Value" value={formatCurrency(revenue.avgBookingValue || 0)} Icon={TrendingUp} accent="text-indigo-600 bg-indigo-50" />
+                <StatCard label="Refunds" value={formatCurrency(revenue.totalRefunds || 0)} Icon={RotateCcw} accent="text-red-600 bg-red-50" />
               </div>
             )}
-          </div>
 
-          {/* Occupancy by room type */}
-          {occupancy?.byRoomType?.length > 0 && (
-            <div className="card p-6">
-              <h2 className="font-semibold text-gray-800 mb-4">Occupancy by Room Type</h2>
-              <div className="space-y-3">
-                {occupancy.byRoomType.map((rt, i) => (
-                  <div key={i} className="flex justify-between items-center">
-                    <span className="text-sm text-gray-700">{rt.name}</span>
-                    <div className="flex items-center gap-3">
-                      <div className="w-32 bg-gray-100 rounded-full h-2">
-                        <div
-                          className="bg-primary-500 h-2 rounded-full"
-                          style={{ width: `${Math.min(100, rt.occupancyRate || 0)}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-medium text-gray-700 w-12 text-right">
-                        {(rt.occupancyRate || 0).toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {/* Booking trends table */}
+            <div className="rounded-2xl border border-gray-100 bg-white p-6 mb-6">
+              <h2 className="font-semibold text-gray-900 mb-4">Booking Trends (Last 6 Months)</h2>
+              {trends.length === 0 ? (
+                <p className="text-gray-400 text-sm">No data available</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-gray-500 text-xs uppercase tracking-wide border-b border-gray-100">
+                        <th className="pb-3">Month</th>
+                        <th className="pb-3">Bookings</th>
+                        <th className="pb-3">Revenue</th>
+                        <th className="pb-3">Cancelled</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {trends.map((t, i) => (
+                        <tr key={i}>
+                          <td className="py-3 text-gray-700">{t.month}</td>
+                          <td className="py-3 text-gray-700">{t.totalBookings}</td>
+                          <td className="py-3 font-medium text-gray-900">{formatCurrency(t.revenue || 0)}</td>
+                          <td className="py-3 text-red-500">{t.cancelledBookings || 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
-        </>
-      )}
+
+            {/* Occupancy by room type */}
+            {occupancy?.byRoomType?.length > 0 && (
+              <div className="rounded-2xl border border-gray-100 bg-white p-6">
+                <h2 className="font-semibold text-gray-900 mb-4">Occupancy by Room Type</h2>
+                <div className="space-y-4">
+                  {occupancy.byRoomType.map((rt, i) => (
+                    <div key={i} className="flex justify-between items-center">
+                      <span className="text-sm text-gray-700">{rt.name}</span>
+                      <div className="flex items-center gap-3">
+                        <div className="w-32 bg-gray-100 rounded-full h-2">
+                          <div
+                            className="bg-primary-500 h-2 rounded-full"
+                            style={{ width: `${Math.min(100, rt.occupancyRate || 0)}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 w-12 text-right">
+                          {(rt.occupancyRate || 0).toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </main>
   );
 }

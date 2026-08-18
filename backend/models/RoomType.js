@@ -41,6 +41,14 @@ module.exports = (sequelize) => {
         type: DataTypes.INTEGER,
         defaultValue: 2,
       },
+      maxAdults: {
+        type: DataTypes.INTEGER,
+        defaultValue: 2,
+      },
+      maxChildren: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+      },
       maxExtraGuests: {
         type: DataTypes.INTEGER,
         defaultValue: 0,

@@ -14,16 +14,16 @@ export const authApi = {
   resetPassword: (data) => executeApi.post('/auth/password/reset', data),
   verifyEmail: (token) => executeApi.post('/auth/email/verify', { token }),
   resendVerification: () => executeApi.post('/auth/email/resend-verification'),
+  // Verified (two-step) registration
+  requestRegistration: (email) => executeApi.post('/auth/register/request', { email }),
+  verifyRegistrationToken: (token) => executeApi.get('/auth/register/verify', { params: { token } }),
+  completeRegistration: (data) => executeApi.post('/auth/register/complete', data),
 };
 
 // ── Hotels ────────────────────────────────────────────────────────────────────
 export const hotelsApi = {
-  list: (params) => executeApi.get('/hotels', { params }),
-  getBySlug: (slug) => executeApi.get(`/hotels/${slug}`),
   getById: (id) => executeApi.get(`/hotels/id/${id}`),
   getFeatured: (limit = 6) => executeApi.get('/hotels/featured', { params: { limit } }),
-  search: (q, limit = 10) => executeApi.get('/hotels/search', { params: { q, limit } }),
-  getPopularCities: () => executeApi.get('/hotels/cities'),
 };
 
 // ── Rooms ─────────────────────────────────────────────────────────────────────
@@ -121,7 +121,6 @@ export const userApi = {
   updateProfile: (data) => executeApi.put('/user/profile', data),
   getMyBookings: (params) => executeApi.get('/user/bookings', { params }),
   getMyReviews: (params) => executeApi.get('/user/reviews', { params }),
-  deactivate: () => executeApi.delete('/user/account'),
 };
 
 // ── Pricing ───────────────────────────────────────────────────────────────────

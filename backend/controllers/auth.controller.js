@@ -9,6 +9,21 @@ exports.register = asyncHandler(async (req, res) => {
   return success(res, 'Registration successful', data, 201);
 });
 
+exports.requestRegistration = asyncHandler(async (req, res) => {
+  const data = await authService.requestRegistration(req.body);
+  return success(res, data.message, null);
+});
+
+exports.verifyRegistrationToken = asyncHandler(async (req, res) => {
+  const data = await authService.verifyRegistrationToken(req.query);
+  return success(res, 'Verification link is valid', data);
+});
+
+exports.completeRegistration = asyncHandler(async (req, res) => {
+  const data = await authService.completeRegistration(req.body);
+  return success(res, 'Registration successful', data, 201);
+});
+
 exports.login = asyncHandler(async (req, res) => {
   const data = await authService.login(req.body);
   return success(res, 'Login successful', data);

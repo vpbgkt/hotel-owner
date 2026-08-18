@@ -14,6 +14,5 @@ router.get('/profile', ctrl.getProfile);
 router.put('/profile', updateProfileValidator, validate, ctrl.updateProfile);
 router.get('/bookings', ctrl.getMyBookings);
 router.get('/reviews', ctrl.getMyReviews);
-router.delete('/account', ctrl.deactivate);
 
 module.exports = router;

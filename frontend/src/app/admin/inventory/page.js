@@ -5,9 +5,10 @@ import { useAuth } from '@/context/AuthContext';
 import { adminApi, roomsApi } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { formatCurrency } from '@/lib/utils';
-import Link from 'next/link';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
+import AdminPageHeader from '@/components/admin/AdminPageHeader';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function AdminInventoryPage() {
   const { user, loading, isAuthenticated } = useAuth();
@@ -18,6 +19,7 @@ export default function AdminInventoryPage() {
   const [loadingRooms, setLoadingRooms] = useState(true);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   // Bulk update form
   const [bulkForm, setBulkForm] = useState({
@@ -75,17 +77,48 @@ export default function AdminInventoryPage() {
     try {
       const res = await adminApi.bulkUpdateInventory(payload);
       toast.success(`Updated ${res.data.data.updatedDates} dates`);
-      // Refresh calendar
-      const startDate = viewMonth.format('YYYY-MM-DD');
-      const endDate = viewMonth.endOf('month').format('YYYY-MM-DD');
-      roomsApi.getInventoryCalendar(selectedRoom.id, { startDate, endDate })
-        .then((r) => setCalendar(r.data.data?.calendar || []))
-        .catch(() => {});
+      refreshCalendar();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Update failed');
     } finally {
       setSaving(false);
     }
+  };
+
+  // Clears every admin override (availability cap, price override, closure,
+  // min-stay) across the selected date range, reverting those dates to the room
+  // type's defaults. A blank field means "no change", so this is the only way to
+  // actively remove an existing override from the UI.
+  const resetRangeToDefault = async () => {
+    if (!selectedRoom) return;
+    if (!confirm(`Reset ${selectedRoom.name} to default from ${bulkForm.startDate} to ${bulkForm.endDate}?\n\nThis clears any availability cap, price override, and closure for these dates.`)) return;
+
+    setResetting(true);
+    try {
+      const res = await adminApi.bulkUpdateInventory({
+        roomTypeId: selectedRoom.id,
+        startDate: bulkForm.startDate,
+        endDate: bulkForm.endDate,
+        resetToDefault: true,
+      });
+      toast.success(`Reset ${res.data.data.updatedDates} dates to default`);
+      // Clear the form's override inputs to reflect the cleared state.
+      setBulkForm((f) => ({ ...f, availableCount: '', priceOverride: '', isClosed: false }));
+      refreshCalendar();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Reset failed');
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const refreshCalendar = () => {
+    if (!selectedRoom) return;
+    const startDate = viewMonth.format('YYYY-MM-DD');
+    const endDate = viewMonth.endOf('month').format('YYYY-MM-DD');
+    roomsApi.getInventoryCalendar(selectedRoom.id, { startDate, endDate })
+      .then((r) => setCalendar(r.data.data?.calendar || []))
+      .catch(() => {});
   };
 
   // Build calendar grid
@@ -96,17 +129,15 @@ export default function AdminInventoryPage() {
   if (loading || !user) return null;
 
   return (
-    <main className="max-w-6xl mx-auto px-4 py-8">
-      <div className="flex items-center gap-4 mb-6 flex-wrap">
-        <Link href="/admin" className="text-gray-400 hover:text-gray-600">← Admin</Link>
-        <h1 className="text-2xl font-bold text-gray-900">Inventory & Availability</h1>
-      </div>
+    <main className="min-h-[80vh] bg-gray-50/50">
+      <AdminPageHeader title="Inventory & Availability" description="Manage room stock, pricing overrides and closures" />
 
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 py-8">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Sidebar: Room selector + bulk update */}
         <div className="space-y-4">
           {/* Room Selector */}
-          <div className="card p-4">
+          <div className="rounded-2xl border border-gray-100 bg-white p-4">
             <h3 className="font-semibold text-gray-900 mb-3">Select Room Type</h3>
             {loadingRooms ? (
               <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-10 bg-gray-100 animate-pulse rounded" />)}</div>
@@ -132,7 +163,7 @@ export default function AdminInventoryPage() {
 
           {/* Bulk Update Panel */}
           {selectedRoom && (
-            <div className="card p-4">
+            <div className="rounded-2xl border border-gray-100 bg-white p-4">
               <h3 className="font-semibold text-gray-900 mb-3">Bulk Update</h3>
               <div className="space-y-3 text-sm">
                 <div>
@@ -186,11 +217,21 @@ export default function AdminInventoryPage() {
                 </label>
                 <button
                   onClick={applyBulkUpdate}
-                  disabled={saving}
+                  disabled={saving || resetting}
                   className="w-full btn-primary text-sm py-2"
                 >
                   {saving ? 'Updating…' : 'Apply to Date Range'}
                 </button>
+                <button
+                  onClick={resetRangeToDefault}
+                  disabled={saving || resetting}
+                  className="w-full text-sm py-2 border border-gray-300 rounded-full text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+                >
+                  {resetting ? 'Resetting…' : 'Reset Range to Default'}
+                </button>
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  Reset clears any availability cap, price override, and closure for the selected dates.
+                </p>
               </div>
             </div>
           )}
@@ -199,7 +240,7 @@ export default function AdminInventoryPage() {
         {/* Calendar View */}
         <div className="lg:col-span-3">
           {selectedRoom ? (
-            <div className="card p-5">
+            <div className="rounded-2xl border border-gray-100 bg-white p-5">
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <h2 className="font-semibold text-gray-900">{selectedRoom.name}</h2>
@@ -210,7 +251,7 @@ export default function AdminInventoryPage() {
                     onClick={() => setViewMonth((m) => m.subtract(1, 'month'))}
                     className="p-2 hover:bg-gray-100 rounded-lg transition"
                   >
-                    ←
+                    <ChevronLeft className="w-4 h-4" />
                   </button>
                   <span className="font-semibold text-gray-800 min-w-[120px] text-center">
                     {viewMonth.format('MMMM YYYY')}
@@ -219,7 +260,7 @@ export default function AdminInventoryPage() {
                     onClick={() => setViewMonth((m) => m.add(1, 'month'))}
                     className="p-2 hover:bg-gray-100 rounded-lg transition"
                   >
-                    →
+                    <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -285,12 +326,13 @@ export default function AdminInventoryPage() {
               </div>
             </div>
           ) : (
-            <div className="card p-10 text-center text-gray-400">
-              <p className="text-5xl mb-3">📅</p>
+            <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center text-gray-400">
+              <Calendar className="w-10 h-10 mx-auto mb-3 text-gray-300" />
               <p>Select a room type to view its availability calendar</p>
             </div>
           )}
         </div>
+      </div>
       </div>
     </main>
   );

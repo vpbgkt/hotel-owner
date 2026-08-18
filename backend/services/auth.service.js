@@ -12,6 +12,7 @@ const LOCKOUT_DURATION_SECONDS = 15 * 60; // 15 min
 const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 const RESET_TOKEN_TTL_SECONDS = 60 * 60; // 1 hour
 const EMAIL_VERIFY_TOKEN_TTL_SECONDS = 24 * 60 * 60; // 24 hours
+const REGISTER_VERIFY_TOKEN_TTL_SECONDS = 24 * 60 * 60; // 24 hours
 
 class AuthService {
   // ── Register ────────────────────────────────────────────────────────────
@@ -38,6 +39,72 @@ class AuthService {
       name,
       role: 'GUEST',
     });
+
+    const tokens = generateTokens(user);
+    await this._storeRefreshToken(user.id, tokens.refreshToken);
+
+    return { user: this._sanitize(user), ...tokens };
+  }
+
+  // ── Verified Registration (step 1): request a verification link ──────────
+  // The guest submits only their email. We stash the email against a token in
+  // Redis and email them a link to /auth/register/complete?token=... . The
+  // account is NOT created until they open that link and finish the form, so
+  // every email-based account starts life already verified.
+  async requestRegistration({ email }) {
+    if (!email) throw createError('Email is required', 400);
+
+    const existing = await User.findOne({ where: { email } });
+    if (existing) throw createError('Email already registered', 409);
+
+    const token = generateResetToken();
+    await redis.set(`register:${token}`, email, 'EX', REGISTER_VERIFY_TOKEN_TTL_SECONDS);
+
+    try {
+      const notificationService = require('./notification.service');
+      await notificationService.sendRegistrationEmail(email, token);
+    } catch {
+      console.log(`[Register Verify] Dev fallback — token for ${email}: ${token}`);
+    }
+
+    return { message: 'Verification email sent' };
+  }
+
+  // ── Verified Registration: check a token is still valid (no consumption) ──
+  async verifyRegistrationToken({ token }) {
+    if (!token) throw createError('Verification token is required', 400);
+    const email = await redis.get(`register:${token}`);
+    if (!email) throw createError('Invalid or expired verification link', 400);
+    return { email };
+  }
+
+  // ── Verified Registration (step 2): complete with account details ────────
+  async completeRegistration({ token, name, phone, password }) {
+    const email = await redis.get(`register:${token}`);
+    if (!email) throw createError('Invalid or expired verification link', 400);
+
+    // Re-check uniqueness in case someone registered the same email/phone
+    // between the request and completion steps.
+    const existingEmail = await User.findOne({ where: { email } });
+    if (existingEmail) {
+      await redis.del(`register:${token}`);
+      throw createError('Email already registered', 409);
+    }
+    if (phone) {
+      const existingPhone = await User.findOne({ where: { phone } });
+      if (existingPhone) throw createError('Phone already registered', 409);
+    }
+
+    const user = await User.create({
+      email,
+      phone: phone || null,
+      password: await hashPassword(password),
+      name,
+      role: 'GUEST',
+      emailVerified: true, // email ownership was just proven via the link
+    });
+
+    await redis.del(`register:${token}`);
 
     const tokens = generateTokens(user);
     await this._storeRefreshToken(user.id, tokens.refreshToken);

@@ -13,12 +13,18 @@ const {
   changePassword: changePasswordValidator,
   requestPasswordReset: requestPasswordResetValidator,
   resetPassword: resetPasswordValidator,
+  requestRegistration: requestRegistrationValidator,
+  completeRegistration: completeRegistrationValidator,
 } = require('../validators/auth.validator');
 
 const router = Router();
 
 // Public routes (rate-limited)
 router.post('/register', authLimiter, registerValidator, validate, ctrl.register);
+// Verified (two-step) registration: request link → complete with details
+router.post('/register/request', authLimiter, requestRegistrationValidator, validate, ctrl.requestRegistration);
+router.get('/register/verify', ctrl.verifyRegistrationToken);
+router.post('/register/complete', authLimiter, completeRegistrationValidator, validate, ctrl.completeRegistration);
 router.post('/login', authLimiter, loginValidator, validate, ctrl.login);
 router.post('/otp/request', authLimiter, requestOTPValidator, validate, ctrl.requestOTP);
 router.post('/otp/verify', authLimiter, verifyOTPValidator, validate, ctrl.verifyOTP);

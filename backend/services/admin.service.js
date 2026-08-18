@@ -35,7 +35,10 @@ class AdminService {
       Booking.count({ where: { hotelId, status: 'PENDING' } }),
       Booking.findAll({
         where: { hotelId },
-        include: [{ model: User, as: 'guest', attributes: ['id', 'name', 'email'] }],
+        include: [
+          { model: User, as: 'guest', attributes: ['id', 'name', 'email'] },
+          { model: RoomType, as: 'roomType', attributes: ['id', 'name'] },
+        ],
         order: [['createdAt', 'DESC']],
         limit: 10,
       }),
@@ -118,20 +121,29 @@ class AdminService {
     });
 
     const updates = {};
-    if (availableCount !== undefined) updates.availableCount = availableCount;
+    // See bulkUpdateInventory: "Available Count" is a manual cap stored in
+    // overrideAvailable and clamped to the room type's totalRooms.
+    if (availableCount !== undefined) {
+      updates.overrideAvailable = Math.max(0, Math.min(availableCount, roomType.totalRooms));
+    }
     if (priceOverride !== undefined) updates.priceOverride = priceOverride;
     if (isClosed !== undefined) updates.isClosed = isClosed;
 
     await inv.update(updates);
+    require('./room.service').invalidateAvailabilityCache(roomTypeId);
     return inv;
   }
 
-  async bulkUpdateInventory(hotelId, { roomTypeId, startDate, endDate, availableCount, priceOverride, isClosed, minStayNights }) {
+  async bulkUpdateInventory(hotelId, { roomTypeId, startDate, endDate, availableCount, priceOverride, isClosed, minStayNights, resetToDefault }) {
     const roomType = await RoomType.findOne({ where: { id: roomTypeId, hotelId } });
     if (!roomType) throw createError('Room type not found', 404);
 
     const roomService = require('./room.service');
-    const dates = roomService._getDateRange(startDate, endDate);
+    // _getDateRange is exclusive of the end date (correct for booking checkout
+    // nights). For a bulk inventory update the admin picks an inclusive
+    // Start/End range, so extend by one day to include the selected end date.
+    const inclusiveEnd = dayjs(endDate).add(1, 'day').format('YYYY-MM-DD');
+    const dates = roomService._getDateRange(startDate, inclusiveEnd);
     const updates = [];
 
     for (const date of dates) {
@@ -140,16 +152,31 @@ class AdminService {
         defaults: { roomTypeId, date, availableCount: roomType.totalRooms },
       });
 
-      const updateData = {};
-      if (availableCount !== undefined) updateData.availableCount = availableCount;
-      if (priceOverride !== undefined) updateData.priceOverride = priceOverride;
-      if (isClosed !== undefined) updateData.isClosed = isClosed;
-      if (minStayNights !== undefined) updateData.minStayNights = minStayNights;
+      let updateData;
+      if (resetToDefault) {
+        // Clear every admin override for the date: availability reverts to the
+        // booking-derived full stock (overrideAvailable = null), price reverts
+        // to the room type's base price (priceOverride = null), the date is
+        // reopened and min-stay returns to the default of 1 night.
+        updateData = { overrideAvailable: null, priceOverride: null, isClosed: false, minStayNights: 1 };
+      } else {
+        updateData = {};
+        // "Available Count" is a manual cap on sellable rooms for the date.
+        // Stored in overrideAvailable (not availableCount, which the booking flow
+        // mutates) and clamped to the room type's totalRooms.
+        if (availableCount !== undefined) {
+          updateData.overrideAvailable = Math.max(0, Math.min(availableCount, roomType.totalRooms));
+        }
+        if (priceOverride !== undefined) updateData.priceOverride = priceOverride;
+        if (isClosed !== undefined) updateData.isClosed = isClosed;
+        if (minStayNights !== undefined) updateData.minStayNights = minStayNights;
+      }
 
       await inv.update(updateData);
       updates.push({ date, ...updateData });
     }
 
+    await roomService.invalidateAvailabilityCache(roomTypeId);
     return { updatedDates: updates.length, dates: updates };
   }
 
@@ -217,9 +244,23 @@ class AdminService {
   }
 
   // ── Booking Management (Admin) ────────────────────────────────────────────
-  async listBookings(hotelId, { page = 1, limit = 20, status } = {}) {
+  async listBookings(hotelId, { page = 1, limit = 10, status, search } = {}) {
     const where = { hotelId };
     if (status) where.status = status;
+
+    if (search && search.trim()) {
+      const term = search.trim();
+      // Case-insensitive substring match on both SQLite (LIKE is case-insensitive
+      // for ASCII by default) and Postgres (iLike). Op.like works on both dialects,
+      // so we use it consistently rather than iLike which only exists on Postgres.
+      const likeTerm = `%${term}%`;
+      where[Op.or] = [
+        { bookingNumber: { [Op.like]: likeTerm } },
+        { guestName: { [Op.like]: likeTerm } },
+        { guestPhone: { [Op.like]: likeTerm } },
+        { guestEmail: { [Op.like]: likeTerm } },
+      ];
+    }
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const { count, rows } = await Booking.findAndCountAll({
@@ -252,13 +293,31 @@ class AdminService {
     const {
       roomTypeId, bookingType = 'DAILY',
       checkInDate, checkOutDate, checkInTime, checkOutTime, numHours,
-      numRooms = 1, numGuests = 1, numExtraGuests = 0,
+      numRooms = 1, numExtraGuests = 0,
       guestName, guestEmail, guestPhone,
       paymentMethod = 'CASH', notes,
     } = data;
 
+    // Guests are captured as adults + children, mirroring the guest-facing
+    // booking flow (booking.service.js). Fall back to legacy numGuests if the
+    // client only sent a single guest count.
+    const numAdults = parseInt(data.numAdults ?? data.numGuests ?? 1);
+    const numChildren = parseInt(data.numChildren ?? 0);
+    const numGuests = numAdults + numChildren;
+
     const roomType = await RoomType.findOne({ where: { id: roomTypeId, hotelId } });
     if (!roomType) throw createError('Room type not found', 404);
+
+    // Enforce the same occupancy limits as the online booking flow, scaled by
+    // number of rooms booked.
+    const maxAdults = (roomType.maxAdults ?? roomType.maxGuests) * numRooms;
+    const maxChildren = (roomType.maxChildren ?? 0) * numRooms;
+    const maxOccupancy = roomType.maxGuests * numRooms;
+
+    if (numAdults < 1) throw createError('At least 1 adult is required', 400);
+    if (numAdults > maxAdults) throw createError(`Max ${maxAdults} adult(s) allowed for ${numRooms} room(s) of this type`, 400);
+    if (numChildren > maxChildren) throw createError(`Max ${maxChildren} child(ren) allowed for ${numRooms} room(s) of this type`, 400);
+    if (numGuests > maxOccupancy) throw createError(`Max occupancy is ${maxOccupancy} guest(s) for ${numRooms} room(s) of this type`, 400);
 
     const hotel = await Hotel.findByPk(hotelId, { attributes: ['id', 'gstRate'] });
     const taxRate = hotel?.gstRate ?? 0.12;
@@ -316,6 +375,8 @@ class AdminService {
       numHours: bookingType === 'HOURLY' ? hours : null,
       numRooms,
       numGuests,
+      numAdults,
+      numChildren,
       numExtraGuests,
       guestName,
       guestEmail,
@@ -347,11 +408,14 @@ class AdminService {
     const guestIds = guestIdRows.map((r) => r.guestId).filter(Boolean);
 
     const userWhere = { id: { [Op.in]: guestIds }, role: 'GUEST' };
-    if (search) {
+    if (search && search.trim()) {
+      // Op.like (not iLike) so it works on both SQLite (dev — LIKE is
+      // case-insensitive for ASCII) and Postgres, consistent with listBookings.
+      const likeTerm = `%${search.trim()}%`;
       userWhere[Op.or] = [
-        { name: { [Op.iLike]: `%${search}%` } },
-        { email: { [Op.iLike]: `%${search}%` } },
-        { phone: { [Op.iLike]: `%${search}%` } },
+        { name: { [Op.like]: likeTerm } },
+        { email: { [Op.like]: likeTerm } },
+        { phone: { [Op.like]: likeTerm } },
       ];
     }
 

@@ -58,8 +58,16 @@ class PaymentService {
         bookingNumber: booking.bookingNumber,
       };
     } catch (err) {
-      throw createError(`Payment gateway error: ${err.message}`, 502);
+      throw createError(`Payment gateway error: ${this._extractRazorpayErrorMessage(err)}`, 502);
     }
+  }
+
+  // Razorpay's SDK throws a plain object ({ statusCode, error: { description, ... } })
+  // rather than an Error instance on API failures, so err.message is always
+  // undefined. Extract the real reason from err.error.description instead, with
+  // fallbacks for genuine Error instances (e.g. network failures).
+  _extractRazorpayErrorMessage(err) {
+    return err?.error?.description || err?.message || 'Unknown error';
   }
 
   async _initiateCash(booking) {
@@ -142,7 +150,7 @@ class PaymentService {
         const refund = await razorpay.payments.refund(payment.gatewayPaymentId, { amount: Math.round(refundAmount * 100) });
         refundId = refund.id;
       } catch (err) {
-        throw createError(`Refund failed: ${err.message}`, 502);
+        throw createError(`Refund failed: ${this._extractRazorpayErrorMessage(err)}`, 502);
       }
     }
 

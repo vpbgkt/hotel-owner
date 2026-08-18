@@ -95,7 +95,11 @@ ENVEOF
 else
   # Update existing .env.local with the correct API URL
   if grep -q "NEXT_PUBLIC_API_URL" .env.local; then
-    sed -i "s|NEXT_PUBLIC_API_URL=.*|NEXT_PUBLIC_API_URL=${BACKEND_URL}|" .env.local
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      sed -i '' "s|NEXT_PUBLIC_API_URL=.*|NEXT_PUBLIC_API_URL=${BACKEND_URL}|" .env.local
+    else
+      sed -i "s|NEXT_PUBLIC_API_URL=.*|NEXT_PUBLIC_API_URL=${BACKEND_URL}|" .env.local
+    fi
   else
     echo "NEXT_PUBLIC_API_URL=${BACKEND_URL}" >> .env.local
   fi
@@ -105,7 +109,11 @@ fi
 # Update backend FRONTEND_URL for CORS
 cd "../backend"
 if grep -q "FRONTEND_URL" .env; then
-  sed -i "s|FRONTEND_URL=.*|FRONTEND_URL=${FRONTEND_ORIGIN}|" .env
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    sed -i '' "s|FRONTEND_URL=.*|FRONTEND_URL=${FRONTEND_ORIGIN}|" .env
+  else
+    sed -i "s|FRONTEND_URL=.*|FRONTEND_URL=${FRONTEND_ORIGIN}|" .env
+  fi
 else
   echo "FRONTEND_URL=${FRONTEND_ORIGIN}" >> .env
 fi

@@ -76,6 +76,14 @@ module.exports = (sequelize) => {
         type: DataTypes.INTEGER,
         defaultValue: 1,
       },
+      numAdults: {
+        type: DataTypes.INTEGER,
+        defaultValue: 1,
+      },
+      numChildren: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+      },
       numExtraGuests: {
         type: DataTypes.INTEGER,
         defaultValue: 0,

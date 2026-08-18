@@ -23,6 +23,8 @@ const createRoomType = [
     .isFloat({ min: 0 }).withMessage('Base price must be >= 0'),
   body('basePriceHourly').optional().isFloat({ min: 0 }),
   body('maxGuests').optional().isInt({ min: 1 }),
+  body('maxAdults').optional().isInt({ min: 1 }),
+  body('maxChildren').optional().isInt({ min: 0 }),
   body('totalRooms')
     .notEmpty().withMessage('Total rooms required')
     .isInt({ min: 1 }).withMessage('Total rooms must be at least 1'),
@@ -35,6 +37,8 @@ const updateRoomType = [
   body('basePriceDaily').optional().isFloat({ min: 0 }),
   body('basePriceHourly').optional().isFloat({ min: 0 }),
   body('maxGuests').optional().isInt({ min: 1 }),
+  body('maxAdults').optional().isInt({ min: 1 }),
+  body('maxChildren').optional().isInt({ min: 0 }),
   body('totalRooms').optional().isInt({ min: 1 }),
   body('amenities').optional().isArray(),
   body('images').optional().isArray(),
@@ -42,16 +46,20 @@ const updateRoomType = [
 ];
 
 const bulkUpdateInventory = [
-  body('roomTypeId').notEmpty().isUUID().withMessage('Valid roomTypeId required'),
+  // RoomType uses an auto-increment integer primary key (matches booking.validator.js).
+  body('roomTypeId').notEmpty().isInt({ min: 1 }).toInt().withMessage('Valid roomTypeId required'),
   body('startDate').notEmpty().isDate({ format: 'YYYY-MM-DD' }),
   body('endDate').notEmpty().isDate({ format: 'YYYY-MM-DD' }),
   body('availableCount').optional().isInt({ min: 0 }),
   body('priceOverride').optional().isFloat({ min: 0 }),
   body('isClosed').optional().isBoolean(),
+  // When true, clears all overrides for the range (the fields above are ignored).
+  body('resetToDefault').optional().isBoolean(),
 ];
 
 const updateSingleInventory = [
-  body('roomTypeId').notEmpty().isUUID().withMessage('Valid roomTypeId required'),
+  // RoomType uses an auto-increment integer primary key (matches booking.validator.js).
+  body('roomTypeId').notEmpty().isInt({ min: 1 }).toInt().withMessage('Valid roomTypeId required'),
   body('date').notEmpty().isDate({ format: 'YYYY-MM-DD' }),
   body('availableCount').optional().isInt({ min: 0 }),
   body('priceOverride').optional().isFloat({ min: 0 }),

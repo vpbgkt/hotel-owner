@@ -2,7 +2,7 @@
 
 const { Op } = require('sequelize');
 const dayjs = require('dayjs');
-const { RoomType, Room, RoomInventory, HourlySlot, Hotel } = require('../models');
+const { RoomType, Room, RoomInventory, HourlySlot, Hotel, Booking } = require('../models');
 const { redis } = require('../config/redis');
 const { createError } = require('../middlewares/errorHandler.middleware');
 
@@ -48,7 +48,9 @@ class RoomService {
     const dates = this._getDateRange(checkInDate, checkOutDate);
     const nights = dates.length;
 
-    // Fetch or create inventory records for each date
+    // Inventory rows are only consulted for admin overrides (closed dates and
+    // price overrides). Availability itself is derived live from active bookings
+    // via _getBookedCountsByDate so it always matches the admin calendar.
     const inventory = await RoomInventory.findAll({
       where: { roomTypeId, date: { [Op.between]: [checkInDate, checkOutDate] } },
     });
@@ -56,22 +58,25 @@ class RoomService {
     const inventoryMap = {};
     inventory.forEach((inv) => { inventoryMap[inv.date] = inv; });
 
-    // Check availability for each date
+    const bookedMap = await this._getBookedCountsByDate(roomTypeId, checkInDate, checkOutDate);
+
+    // Availability per night = totalRooms - rooms held by active bookings
     let minAvailable = roomType.totalRooms;
     const dailyPrices = [];
     let isClosed = false;
 
     for (const date of dates) {
       const inv = inventoryMap[date];
-      if (inv) {
-        if (inv.isClosed) { isClosed = true; break; }
-        minAvailable = Math.min(minAvailable, inv.availableCount);
-        dailyPrices.push({ date, price: inv.priceOverride || roomType.basePriceDaily });
-      } else {
-        // No override — use base availability
-        dailyPrices.push({ date, price: roomType.basePriceDaily });
-      }
+      if (inv && inv.isClosed) { isClosed = true; break; }
+      const booked = bookedMap[date] || 0;
+      // An admin-set manual cap (overrideAvailable) limits sellable rooms for
+      // the date; otherwise the full room count applies. Bookings are still
+      // subtracted live so availability never oversells.
+      const cap = (inv && inv.overrideAvailable != null) ? inv.overrideAvailable : roomType.totalRooms;
+      minAvailable = Math.min(minAvailable, cap - booked);
+      dailyPrices.push({ date, price: (inv && inv.priceOverride) || roomType.basePriceDaily });
     }
+    minAvailable = Math.max(0, minAvailable);
 
     const isAvailable = !isClosed && minAvailable >= numRooms;
     const pricePerNight = this._getEffectivePrice(dailyPrices, roomType.basePriceDaily);
@@ -154,21 +159,43 @@ class RoomService {
     const inventoryMap = {};
     inventory.forEach((inv) => { inventoryMap[inv.date] = inv; });
 
-    // Fill all dates in range with defaults
-    const dates = this._getDateRange(startDate, endDate);
-    const calendar = dates.map((date) => {
+    // Availability is derived live from active bookings so it can never drift.
+    const bookedMap = await this._getBookedCountsByDate(roomTypeId, startDate, endDate);
+
+    // Fill all dates in range (inclusive of the final day)
+    const calendar = [];
+    let cur = dayjs(startDate);
+    const last = dayjs(endDate);
+    while (!cur.isAfter(last)) {
+      const date = cur.format('YYYY-MM-DD');
       const inv = inventoryMap[date];
-      return {
+      const isClosed = inv ? inv.isClosed : false;
+      const booked = bookedMap[date] || 0;
+      // Respect an admin-set manual cap (overrideAvailable) when present,
+      // otherwise fall back to the full room count. Availability stays
+      // booking-derived so it can never drift.
+      const cap = (inv && inv.overrideAvailable != null) ? inv.overrideAvailable : roomType.totalRooms;
+      const available = Math.max(0, cap - booked);
+      calendar.push({
         date,
-        availableCount: inv ? inv.availableCount : roomType.totalRooms,
+        availableCount: isClosed ? 0 : available,
         priceOverride: inv ? inv.priceOverride : null,
-        effectivePrice: inv?.priceOverride || roomType.basePriceDaily,
-        isClosed: inv ? inv.isClosed : false,
+        effectivePrice: (inv && inv.priceOverride) || roomType.basePriceDaily,
+        isClosed,
         minStayNights: inv ? inv.minStayNights : 1,
-      };
-    });
+      });
+      cur = cur.add(1, 'day');
+    }
 
     return { roomType, calendar };
+  }
+
+  // ── Invalidate cached daily availability for a room type ─────────────────
+  // Call after admin inventory changes (closures, caps, price overrides) so the
+  // guest booking flow reflects them immediately rather than after TTL expiry.
+  async invalidateAvailabilityCache(roomTypeId) {
+    const keys = await redis.keys(`avail:daily:${roomTypeId}:*`).catch(() => []);
+    if (keys.length > 0) await redis.del(...keys).catch(() => {});
   }
 
   // ── Get or create inventory record ──────────────────────────────────────
@@ -205,7 +232,7 @@ class RoomService {
     if (keys.length > 0) await redis.del(...keys).catch(() => {});
   }
 
-  // ── Restore availability (on cancel) ────────────────────────────────────
+  // ── Restore availability (on cancel / checkout) ──────────────────────────
   async restoreAvailability(roomTypeId, dates, numRooms) {
     const roomType = await RoomType.findByPk(roomTypeId);
     if (!roomType) return;
@@ -220,6 +247,39 @@ class RoomService {
         },
       });
     }
+
+    // Invalidate availability cache so the next check returns fresh data
+    const keys = await redis.keys(`avail:daily:${roomTypeId}:*`).catch(() => []);
+    if (keys.length > 0) await redis.del(...keys).catch(() => {});
+  }
+
+  // ── Rooms held by active bookings, per date (source of truth) ────────────
+  // Shared by checkDailyAvailability (guest booking flow) and
+  // getInventoryCalendar (admin calendar) so both always report the same number.
+  //
+  // A DAILY booking occupies each night from checkInDate (inclusive) to
+  // checkOutDate (exclusive) — a 26→27 Jul stay occupies the 26th only.
+  // CANCELLED / CHECKED_OUT / NO_SHOW bookings release their rooms, so they are
+  // excluded from the count.
+  async _getBookedCountsByDate(roomTypeId, startDate, endDate) {
+    const activeBookings = await Booking.findAll({
+      where: {
+        roomTypeId,
+        bookingType: 'DAILY',
+        status: { [Op.notIn]: ['CANCELLED', 'CHECKED_OUT', 'NO_SHOW'] },
+        checkInDate: { [Op.lte]: endDate },
+        checkOutDate: { [Op.gt]: startDate },
+      },
+      attributes: ['checkInDate', 'checkOutDate', 'numRooms'],
+    });
+
+    const counts = {};
+    for (const b of activeBookings) {
+      for (const d of this._getDateRange(b.checkInDate, b.checkOutDate)) {
+        counts[d] = (counts[d] || 0) + (b.numRooms || 1);
+      }
+    }
+    return counts;
   }
 
   _getDateRange(startDate, endDate) {

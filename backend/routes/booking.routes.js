@@ -4,6 +4,7 @@ const { Router } = require('express');
 const ctrl = require('../controllers/booking.controller');
 const { authenticate } = require('../middlewares/auth.middleware');
 const { requireRoles } = require('../middlewares/role.middleware');
+const { requireVerifiedEmail } = require('../middlewares/verifiedEmail.middleware');
 const validate = require('../middlewares/validate.middleware');
 const {
   createDailyBooking: createDailyBookingValidator,
@@ -17,9 +18,9 @@ const router = Router();
 
 router.use(authenticate);
 
-// Guest routes
-router.post('/daily', createDailyBookingValidator, validate, ctrl.createDaily);
-router.post('/hourly', createHourlyBookingValidator, validate, ctrl.createHourly);
+// Guest routes — a verified email is required to create a booking
+router.post('/daily', requireVerifiedEmail, createDailyBookingValidator, validate, ctrl.createDaily);
+router.post('/hourly', requireVerifiedEmail, createHourlyBookingValidator, validate, ctrl.createHourly);
 router.get('/my', ctrl.myBookings);
 router.get('/number/:bookingNumber', ctrl.getByNumber);
 router.get('/:id', ctrl.getById);

@@ -9,8 +9,8 @@ const updateProfile = [
     .isEmail().withMessage('Valid email required')
     .normalizeEmail(),
   body('phone')
-    .optional({ nullable: true })
-    .isMobilePhone().withMessage('Valid phone number required'),
+    .optional({ nullable: true, checkFalsy: true })
+    .matches(/^\+?[0-9]{7,15}$/).withMessage('Phone must be 7-15 digits (e.g. +919876543210)'),
   body('avatarUrl')
     .optional({ nullable: true })
     .isURL().withMessage('Avatar URL must be a valid URL'),

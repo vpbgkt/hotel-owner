@@ -45,6 +45,21 @@ export function AuthProvider({ children }) {
     return userData;
   }, []);
 
+  // Two-step verified registration: step 1 emails a link, step 2 completes the
+  // account and logs the user in (same token handling as register/login).
+  const requestRegistration = useCallback(async (email) => {
+    await authApi.requestRegistration(email);
+  }, []);
+
+  const completeRegistration = useCallback(async (data) => {
+    const res = await authApi.completeRegistration(data);
+    const { accessToken, refreshToken, user: userData } = res.data.data;
+    localStorage.setItem('accessToken', accessToken);
+    localStorage.setItem('refreshToken', refreshToken);
+    setUser(userData);
+    return userData;
+  }, []);
+
   const verifyOTP = useCallback(async (data) => {
     const res = await authApi.verifyOTP(data);
     const { accessToken, refreshToken, user: userData } = res.data.data;
@@ -67,7 +82,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, verifyOTP, logout, updateUser, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, register, requestRegistration, completeRegistration, verifyOTP, logout, updateUser, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

@@ -72,6 +72,27 @@ const verifyEmail = [
   body('token').notEmpty().withMessage('Verification token is required'),
 ];
 
+const requestRegistration = [
+  body('email')
+    .notEmpty().withMessage('Email is required')
+    .isEmail().withMessage('Valid email is required')
+    .normalizeEmail(),
+];
+
+const completeRegistration = [
+  body('token').notEmpty().withMessage('Verification token is required'),
+  body('name')
+    .notEmpty().withMessage('Name is required')
+    .isLength({ max: 255 }).withMessage('Name too long'),
+  body('phone')
+    .optional({ nullable: true, checkFalsy: true })
+    .matches(/^\+?[0-9]{7,15}$/).withMessage('Phone must be 7-15 digits (e.g. +919876543210)'),
+  body('password')
+    .notEmpty().withMessage('Password is required')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must have uppercase, lowercase, and a number (e.g. Pass@123)'),
+];
+
 const refreshToken = [
   body('refreshToken').notEmpty().withMessage('Refresh token is required'),
 ];
@@ -86,4 +107,6 @@ module.exports = {
   resetPassword,
   verifyEmail,
   refreshToken,
+  requestRegistration,
+  completeRegistration,
 };
