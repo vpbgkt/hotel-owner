@@ -1,14 +1,19 @@
 # Hotel Manager — Production Docker Compose (Ubuntu VPS)
 #
-# Stack: Nginx (TLS termination + reverse proxy) -> web (Next.js) + api (Express)
+# Stack: Nginx (internal reverse proxy, HTTP only) -> web (Next.js) + api (Express)
+# TLS termination happens on the HOST's existing Nginx (shared with other sites
+# on this VPS) — this container's nginx only listens on 127.0.0.1, never on
+# the public 80/443, so it never conflicts with anything else on the box.
 # Database: external Supabase Postgres (not containerized)
 # Cache: Redis container (local, not exposed to the internet)
 #
 # Setup:
 #   1. cp backend/.env.production.example backend/.env.production   (fill in Supabase + secrets)
-#   2. cp .env.example .env                                          (set DOMAIN, LETSENCRYPT_EMAIL, build args)
-#   3. bash init-letsencrypt.sh     (first-time only — issues the SSL certificate)
-#   4. docker compose up -d --build
+#   2. cp .env.example .env                                          (set HOTEL_NGINX_PORT, build args)
+#   3. docker compose up -d --build
+#   4. Add a server block to the HOST nginx that proxies the domain to
+#      127.0.0.1:${HOTEL_NGINX_PORT} (see deployment notes) and issue the
+#      cert with your existing host-level certbot flow.
 #
 # Usage:
 #   docker compose up -d --build      # build and start everything
@@ -79,49 +84,27 @@ services:
         condition: service_healthy
 
   # ============================================
-  # NGINX (reverse proxy + TLS termination)
+  # NGINX (internal reverse proxy — HTTP only, loopback-bound)
+  # No TLS here — the host's existing Nginx terminates TLS and proxies to
+  # 127.0.0.1:${HOTEL_NGINX_PORT}, exactly like your other two sites.
   # ============================================
   nginx:
     image: nginx:1.27-alpine
     container_name: hotel-nginx
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      DOMAIN: ${DOMAIN}
+      - "127.0.0.1:${HOTEL_NGINX_PORT:-8081}:80"
     volumes:
-      - ./nginx/conf.d:/etc/nginx/templates:ro
-      - ./certbot/conf:/etc/letsencrypt:ro
-      - ./certbot/www:/var/www/certbot:ro
+      - ./nginx/conf.d/app-internal.conf.template:/etc/nginx/templates/app.conf.template:ro
       - nginx_active_conf:/etc/nginx/conf.d
     entrypoint: >
       sh -c "
-        if [ -f /etc/letsencrypt/live/$$DOMAIN/fullchain.pem ]; then
-          echo 'Certificate found — using full HTTPS config';
-          envsubst '$$DOMAIN' < /etc/nginx/templates/app.conf.template > /etc/nginx/conf.d/app.conf;
-        else
-          echo 'No certificate yet — using HTTP-only bootstrap config';
-          envsubst '$$DOMAIN' < /etc/nginx/templates/app-bootstrap.conf.template > /etc/nginx/conf.d/app.conf;
-        fi &&
+        envsubst < /etc/nginx/templates/app.conf.template > /etc/nginx/conf.d/app.conf &&
         exec nginx -g 'daemon off;'
       "
     depends_on:
       - web
       - api
-
-  # ============================================
-  # CERTBOT (renews the Let's Encrypt certificate every 12h)
-  # ============================================
-  certbot:
-    image: certbot/certbot:latest
-    container_name: hotel-certbot
-    restart: unless-stopped
-    volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
-    entrypoint: >
-      sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h & wait $${!}; done"
 
 volumes:
   redis_data:

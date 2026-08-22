@@ -1,30 +1,11 @@
-# Nginx reverse proxy — Hotel Manager
-# ${DOMAIN} is substituted at container startup via envsubst (see docker-compose command).
+# Internal reverse proxy — Hotel Manager
+# Plain HTTP only. Bound to 127.0.0.1 on the host (see docker-compose.yml).
+# The host's own Nginx terminates TLS and forwards here, same pattern as the
+# other sites already running on this VPS.
 
-# ── HTTP: ACME challenge + redirect everything else to HTTPS ─────────────────
 server {
     listen 80;
-    server_name ${DOMAIN};
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    location / {
-        return 301 https://$host$request_uri;
-    }
-}
-
-# ── HTTPS: reverse proxy to frontend (Next.js) and backend (Express) ─────────
-server {
-    listen 443 ssl;
-    http2 on;
-    server_name ${DOMAIN};
-
-    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+    server_name _;
 
     client_max_body_size 15m;
 
