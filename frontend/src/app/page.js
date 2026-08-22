@@ -5,6 +5,11 @@ import Reveal from '@/components/ui/Reveal';
 
 export const metadata = { title: 'Grand Horizon Hotel — Luxury Stays', description: 'Book your perfect stay. Luxury rooms, world-class amenities, and unbeatable hospitality.' };
 
+// Fetches live hotel data from the backend API, which isn't reachable during
+// `docker build` — force runtime rendering instead of build-time prerendering
+// (see /rooms/book/page.js for the full explanation).
+export const dynamic = 'force-dynamic';
+
 const FALLBACK_ROOM_IMGS = [
   'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&q=80',
   'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800&q=80',

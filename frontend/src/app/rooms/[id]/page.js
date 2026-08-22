@@ -8,6 +8,10 @@ import Reveal from '@/components/ui/Reveal';
 import { getAmenityIcon } from '@/lib/amenities';
 import { Users, Ruler, BedDouble, Home, Clock, UserPlus, CigaretteOff, ShieldCheck } from 'lucide-react';
 
+// Fetches live room data from the backend API — not reachable during
+// `docker build`. Render at runtime instead of build-time prerendering.
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata({ params }) {
   const { id } = await params;
   try {
