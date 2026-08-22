@@ -47,9 +47,13 @@ prisma/generated
 
 # Production secrets
 .env.production
+backend/.env.production
 nginx/certs/*.crt
 nginx/certs/*.key
 nginx/certs/*.pem
+
+# Let's Encrypt certificates and ACME challenge files
+certbot/
 
 # Standalone exports
 radhika-resort/
