@@ -16,6 +16,7 @@ export default function AboutPage() {
   const hotelName = hotel?.name || 'Grand Horizon';
   const amenities = hotel?.amenities || [];
   const cover = resolveImg(hotel?.coverImageUrl) || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1600&q=85';
+  const aboutImg = resolveImg(hotel?.themeConfig?.aboutImage) || 'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=900&q=85';
 
   return (
     <main>
@@ -46,7 +47,7 @@ export default function AboutPage() {
           </Reveal>
           <Reveal delay={120}>
             <img
-              src="https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=900&q=85"
+              src={aboutImg}
               alt="Hotel interior"
               className="rounded-2xl shadow-xl w-full h-[420px] object-cover"
             />

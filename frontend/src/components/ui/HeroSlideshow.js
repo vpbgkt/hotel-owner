@@ -14,7 +14,11 @@ const DEFAULT_SLIDES = [
 ];
 
 export default function HeroSlideshow({ hotel, roomTypes = [] }) {
-  const slides = DEFAULT_SLIDES;
+  // Use admin-configured slider images if available, otherwise fall back to defaults.
+  const customSlides = (hotel?.themeConfig?.sliderImages || []).filter(Boolean);
+  const slides = customSlides.length > 0
+    ? customSlides.map((img, i) => ({ img, label: DEFAULT_SLIDES[i % DEFAULT_SLIDES.length].label }))
+    : DEFAULT_SLIDES;
   const [current, setCurrent] = useState(0);
 
   const go = useCallback((indexOrFn) => {

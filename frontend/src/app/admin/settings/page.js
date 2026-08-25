@@ -72,6 +72,39 @@ export default function AdminSettingsPage() {
   const [newAmenity, setNewAmenity] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#c5a880');
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
+  const [sliderImages, setSliderImages] = useState([]);
+  const [aboutImage, setAboutImage] = useState('');
+  const galleryFileRef = useRef(null);
+  const sliderFileRef = useRef(null);
+  const [galleryUploading, setGalleryUploading] = useState(false);
+  const [sliderUploading, setSliderUploading] = useState(false);
+  const [nearbyPlaces, setNearbyPlaces] = useState([]);
+
+  const handleGalleryUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setGalleryUploading(true);
+    try {
+      const res = await uploadApi.uploadMultiple(files);
+      const urls = (res.data.data?.files || []).map((f) => f.url);
+      setHeroImages((prev) => [...prev, ...urls]);
+      toast.success(`${urls.length} image(s) uploaded`);
+    } catch { toast.error('Upload failed'); }
+    finally { setGalleryUploading(false); e.target.value = ''; }
+  };
+
+  const handleSliderUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setSliderUploading(true);
+    try {
+      const res = await uploadApi.uploadMultiple(files);
+      const urls = (res.data.data?.files || []).map((f) => f.url);
+      setSliderImages((prev) => [...prev, ...urls]);
+      toast.success(`${urls.length} image(s) uploaded`);
+    } catch { toast.error('Upload failed'); }
+    finally { setSliderUploading(false); e.target.value = ''; }
+  };
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm();
 
@@ -89,6 +122,9 @@ export default function AdminSettingsPage() {
         setHeroImages(h.heroImages || []);
         setPrimaryColor(h.themeConfig?.primaryColor || '#c5a880');
         setBackgroundColor(h.themeConfig?.backgroundColor || '#ffffff');
+        setSliderImages(h.themeConfig?.sliderImages || []);
+        setAboutImage(h.themeConfig?.aboutImage || '');
+        setNearbyPlaces(h.themeConfig?.nearbyPlaces || []);
         const savedAmenities = h.amenities || [];
         setSelectedAmenities(savedAmenities);
         // Make sure any custom amenities already saved on the hotel (but not
@@ -127,7 +163,7 @@ export default function AdminSettingsPage() {
       await adminApi.updateHotel({
         ...data, gstRate, coverImageUrl, logoUrl, heroImages,
         amenities: selectedAmenities,
-        themeConfig: { primaryColor, backgroundColor },
+        themeConfig: { primaryColor, backgroundColor, sliderImages, aboutImage, nearbyPlaces: nearbyPlaces.filter(p => p.name) },
       });
       toast.success('Settings saved!');
     } catch (err) {
@@ -158,6 +194,7 @@ export default function AdminSettingsPage() {
     { id: 'theme', label: 'Theme' },
     { id: 'general', label: 'General' },
     { id: 'amenities', label: 'Amenities' },
+    { id: 'nearby', label: 'Nearby Places' },
     { id: 'tax', label: 'Tax & GST' },
     { id: 'timing', label: 'Timings' },
     { id: 'contact', label: 'Contact' },
@@ -191,7 +228,13 @@ export default function AdminSettingsPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="label mb-0">Gallery Images</label>
-                <button type="button" onClick={() => setHeroImages((p) => [...p, ''])} className="flex items-center gap-1 text-xs px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50"><Plus className="w-3.5 h-3.5" /> Add Image</button>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => galleryFileRef.current?.click()} disabled={galleryUploading} className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+                    <Upload className="w-3.5 h-3.5" /> {galleryUploading ? 'Uploading…' : 'Upload'}
+                  </button>
+                  <button type="button" onClick={() => setHeroImages((p) => [...p, ''])} className="flex items-center gap-1 text-xs px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50"><Plus className="w-3.5 h-3.5" /> Add URL</button>
+                </div>
+                <input ref={galleryFileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryUpload} />
               </div>
               {heroImages.length === 0 && <p className="text-xs text-gray-400 italic">No gallery images yet.</p>}
               <div className="space-y-2">
@@ -204,6 +247,39 @@ export default function AdminSettingsPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Home Slider Images */}
+            <div className="border-t border-gray-100 pt-6">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <label className="label mb-0">Home Page Slider Images</label>
+                  <p className="text-xs text-gray-400 mt-0.5">Full-screen background images for the homepage hero slider. Recommended: 1920x1080px landscape.</p>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button type="button" onClick={() => sliderFileRef.current?.click()} disabled={sliderUploading} className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+                    <Upload className="w-3.5 h-3.5" /> {sliderUploading ? 'Uploading…' : 'Upload'}
+                  </button>
+                  <button type="button" onClick={() => setSliderImages((p) => [...p, ''])} className="flex items-center gap-1 text-xs px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50"><Plus className="w-3.5 h-3.5" /> Add URL</button>
+                </div>
+                <input ref={sliderFileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleSliderUpload} />
+              </div>
+              {sliderImages.length === 0 && <p className="text-xs text-gray-400 italic mt-2">No slider images yet. Default stock images will be used.</p>}
+              <div className="space-y-2 mt-2">
+                {sliderImages.map((url, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    {resolveImg(url) && <img src={resolveImg(url)} alt="" className="w-14 h-10 object-cover rounded border flex-shrink-0" onError={(e) => (e.target.style.display = 'none')} />}
+                    <input type="text" className="input flex-1 text-sm" placeholder="Image URL or /uploads/..." value={url}
+                      onChange={(e) => { const n = [...sliderImages]; n[i] = e.target.value; setSliderImages(n); }} />
+                    <button type="button" onClick={() => setSliderImages((s) => s.filter((_, idx) => idx !== i))} className="text-red-500 hover:text-red-700 flex-shrink-0"><X className="w-4 h-4" /></button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* About Page Image */}
+            <div className="border-t border-gray-100 pt-6">
+              <ImageUploadField label="About Page Image" value={aboutImage} onChange={setAboutImage} hint="Shown on the About page story section. Recommended: 900x600px landscape." />
             </div>
           </div>
         )}
@@ -368,6 +444,68 @@ export default function AdminSettingsPage() {
               ))}
             </div>
             <p className="text-xs text-gray-400 mt-3">{selectedAmenities.length} selected</p>
+          </div>
+        )}
+
+        {activeTab === 'nearby' && (
+          <div className="card p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-1">Nearby Places</h2>
+                <p className="text-sm text-gray-500">Add popular landmarks, attractions, or useful places near your hotel. These are shown on the homepage.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNearbyPlaces((prev) => [...prev, { name: '', distance: '', image: '' }])}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 flex-shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Place
+              </button>
+            </div>
+
+            {nearbyPlaces.length === 0 && (
+              <p className="text-sm text-gray-400 italic py-4 text-center">No nearby places added yet. Click "Add Place" to get started.</p>
+            )}
+
+            <div className="space-y-3">
+              {nearbyPlaces.map((place, i) => (
+                <div key={i} className="p-4 rounded-xl border border-gray-100 bg-gray-50/50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-gray-500">Place #{i + 1}</span>
+                    <button type="button" onClick={() => setNearbyPlaces((p) => p.filter((_, idx) => idx !== i))} className="text-red-500 hover:text-red-700"><X className="w-4 h-4" /></button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="label">Place Name</label>
+                      <input
+                        className="input text-sm"
+                        placeholder="e.g. City Palace"
+                        value={place.name}
+                        onChange={(e) => { const n = [...nearbyPlaces]; n[i] = { ...n[i], name: e.target.value }; setNearbyPlaces(n); }}
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Distance</label>
+                      <input
+                        className="input text-sm"
+                        placeholder="e.g. 2 km"
+                        value={place.distance}
+                        onChange={(e) => { const n = [...nearbyPlaces]; n[i] = { ...n[i], distance: e.target.value }; setNearbyPlaces(n); }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Image URL (optional)</label>
+                    <input
+                      className="input text-sm"
+                      placeholder="https://... or /uploads/..."
+                      value={place.image || ''}
+                      onChange={(e) => { const n = [...nearbyPlaces]; n[i] = { ...n[i], image: e.target.value }; setNearbyPlaces(n); }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
