@@ -39,6 +39,7 @@ export default async function HomePage() {
   const roomTypes = firstHotel?.roomTypes || [];
   const hotelName = firstHotel?.name || 'Grand Horizon';
   const amenities = firstHotel?.amenities || [];
+  const nearbyPlaces = firstHotel?.themeConfig?.nearbyPlaces?.filter(p => p.name) || [];
 
   return (
     <main>
@@ -155,6 +156,38 @@ export default async function HomePage() {
           </Reveal>
         )}
       </section>
+
+      {/* ── Nearby Places ─────────────────────────────────────────────── */}
+      {nearbyPlaces.length > 0 && (
+        <section className="bg-primary-50/60 py-20 lg:py-28">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8">
+            <Reveal className="text-center mb-14">
+              <span className="eyebrow">Explore the Area</span>
+              <h2 className="font-display text-4xl md:text-5xl font-semibold text-gray-900 mt-4 mb-3">Nearby Places</h2>
+              <p className="text-gray-500 max-w-xl mx-auto">Popular attractions and landmarks just a short distance from {hotelName}.</p>
+            </Reveal>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {nearbyPlaces.map((place, i) => (
+                <Reveal key={i} delay={(i % 4) * 80} className="bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-md transition-shadow">
+                  <div className="h-40 bg-gray-100 overflow-hidden">
+                    <img
+                      src={resolveImg(place.image) || `https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=500&q=80`}
+                      alt={place.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-900 text-base">{place.name}</h3>
+                    {place.distance && (
+                      <p className="text-primary-600 text-sm font-medium mt-1">{place.distance}</p>
+                    )}
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── CTA Banner ──────────────────────────────────────────────── */}
       <section className="relative py-24 px-5 overflow-hidden">
