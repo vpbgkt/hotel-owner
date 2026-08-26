@@ -104,16 +104,16 @@ export default function LoginPage() {
         <Link href="/auth/register" className="text-primary-600 hover:underline font-medium">Create account</Link>
       </p>
 
-      {/* Demo Credentials */}
-      <div className="mt-6 p-4 bg-primary-50 rounded-xl border border-primary-100 text-sm">
-        <p className="font-semibold text-gray-900 mb-2 flex items-center gap-1.5">
-          <KeyRound className="w-3.5 h-3.5 text-primary-600" /> Demo Credentials
-        </p>
-        <div className="space-y-1.5 text-gray-700">
-          <p><span className="font-medium">Admin:</span> admin@grandhorizon.com / Admin@123</p>
-          <p><span className="font-medium">Guest:</span> guest@example.com / Guest@123</p>
-        </div>
-      </div>
+      {/* Demo Credentials
+      // <div className="mt-6 p-4 bg-primary-50 rounded-xl border border-primary-100 text-sm">
+      //   <p className="font-semibold text-gray-900 mb-2 flex items-center gap-1.5">
+      //     <KeyRound className="w-3.5 h-3.5 text-primary-600" /> Demo Credentials
+      //   </p>
+      //   <div className="space-y-1.5 text-gray-700">
+      //     <p><span className="font-medium">Admin:</span> admin@grandhorizon.com / Admin@123</p>
+      //     <p><span className="font-medium">Guest:</span> guest@example.com / Guest@123</p>
+      //   </div>
+      // </div> */}
     </AuthCard>
   );
 }

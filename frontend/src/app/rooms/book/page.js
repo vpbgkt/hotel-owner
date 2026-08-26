@@ -3,6 +3,12 @@ import Link from 'next/link';
 import Reveal from '@/components/ui/Reveal';
 import { MapPin, Users, BedDouble, Ruler, Phone, Mail, Star, BedSingle, ArrowRight } from 'lucide-react';
 
+// This page fetches live hotel/room data from the backend API. That API isn't
+// reachable during `docker build` (no compose network yet), so this route
+// must NOT be statically prerendered at build time — render it per-request
+// at runtime instead, where INTERNAL_API_URL resolves over the docker network.
+export const dynamic = 'force-dynamic';
+
 const FALLBACK_ROOM_IMGS = [
   'https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=800&q=80',
   'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800&q=80',

@@ -1,5 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Produces a self-contained .next/standalone build (only the node_modules
+  // actually used at runtime) — keeps the production Docker image small and
+  // avoids needing the full node_modules tree in the final image.
+  output: 'standalone',
   images: {
     remotePatterns: [
       { protocol: 'http', hostname: 'localhost', port: '4000', pathname: '/uploads/**' },

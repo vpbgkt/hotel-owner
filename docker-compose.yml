@@ -1,152 +1,109 @@
-# Hotel Manager - Docker Compose for Local Development
-# Usage: docker-compose up -d
-# Lite mode (no Redis): docker-compose up postgres api web mailpit
-
-version: '3.9'
+# Hotel Manager — Production Docker Compose (Ubuntu VPS)
+#
+# Stack: Nginx (internal reverse proxy, HTTP only) -> web (Next.js) + api (Express)
+# TLS termination happens on the HOST's existing Nginx (shared with other sites
+# on this VPS) — this container's nginx only listens on 127.0.0.1, never on
+# the public 80/443, so it never conflicts with anything else on the box.
+# Database: external Supabase Postgres (not containerized)
+# Cache: Redis container (local, not exposed to the internet)
+#
+# Setup:
+#   1. cp backend/.env.production.example backend/.env.production   (fill in Supabase + secrets)
+#   2. cp .env.example .env                                          (set HOTEL_NGINX_PORT, build args)
+#   3. docker compose up -d --build
+#   4. Add a server block to the HOST nginx that proxies the domain to
+#      127.0.0.1:${HOTEL_NGINX_PORT} (see deployment notes) and issue the
+#      cert with your existing host-level certbot flow.
+#
+# Usage:
+#   docker compose up -d --build      # build and start everything
+#   docker compose logs -f api        # tail backend logs
+#   docker compose restart nginx      # reload nginx after a config change
+#   docker compose down               # stop everything (data volumes persist)
 
 services:
   # ============================================
-  # DATABASE
-  # ============================================
-  postgres:
-    image: postgres:16-alpine
-    container_name: hotel-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: hotel
-      POSTGRES_PASSWORD: hotel_secret
-      POSTGRES_DB: hotel
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hotel"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  # ============================================
-  # CACHE (Optional — app works without it)
+  # CACHE (Redis — internal only, not published to host)
   # ============================================
   redis:
     image: redis:7-alpine
     container_name: hotel-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass hotel_redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "hotel_redis", "ping"]
-      interval: 5s
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
       timeout: 5s
       retries: 5
-    profiles:
-      - full
 
   # ============================================
-  # API (NestJS)
+  # API (Express + Sequelize -> Supabase Postgres)
   # ============================================
   api:
     build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-      target: development
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: hotel-api
     restart: unless-stopped
+    env_file:
+      - ./backend/.env.production
     environment:
-      NODE_ENV: development
-      PORT: 4000
-      DATABASE_URL: postgresql://hotel:hotel_secret@postgres:5432/hotel
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: hotel_redis
-      REDIS_ENABLED: "false"
-      HOTEL_ID: ${HOTEL_ID:-}
-      APP_NAME: ${APP_NAME:-My Hotel}
-      JWT_SECRET: dev_jwt_secret_change_in_production
-      JWT_EXPIRES_IN: 7d
-      CORS_ORIGINS: http://localhost:3000
-      SMTP_HOST: mailpit
-      SMTP_PORT: 1025
-      SMTP_FROM: "${APP_NAME:-My Hotel} <noreply@localhost>"
-    ports:
-      - "4000:4000"
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     volumes:
-      - ./apps/api:/app/apps/api:cached
-      - ./packages:/app/packages:cached
-      - /app/node_modules
-      - /app/apps/api/node_modules
+      - uploads_data:/app/uploads
     depends_on:
-      postgres:
+      redis:
         condition: service_healthy
-    command: npm run dev:api
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   # ============================================
   # WEB (Next.js)
   # ============================================
   web:
     build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      target: development
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+        NEXT_PUBLIC_RAZORPAY_KEY_ID: ${NEXT_PUBLIC_RAZORPAY_KEY_ID:-}
     container_name: hotel-web
     restart: unless-stopped
     environment:
-      NODE_ENV: development
-      NEXT_PUBLIC_API_URL: http://localhost:4000/graphql
-      NEXT_PUBLIC_SITE_URL: http://localhost:3000
-      API_URL: http://api:4000/graphql
-      HOTEL_ID: ${HOTEL_ID:-}
-      APP_NAME: ${APP_NAME:-My Hotel}
+      INTERNAL_API_URL: http://api:4000/api
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # ============================================
+  # NGINX (internal reverse proxy — HTTP only, loopback-bound)
+  # No TLS here — the host's existing Nginx terminates TLS and proxies to
+  # 127.0.0.1:${HOTEL_NGINX_PORT}, exactly like your other two sites.
+  # ============================================
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: hotel-nginx
+    restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:${HOTEL_NGINX_PORT:-8081}:80"
     volumes:
-      - ./apps/web:/app/apps/web:cached
-      - ./packages:/app/packages:cached
-      - /app/node_modules
-      - /app/apps/web/node_modules
-      - /app/apps/web/.next
+      # Mounted straight into conf.d — no envsubst needed since this template
+      # has no ${VARS} to substitute (TLS/DOMAIN live on the host nginx now).
+      # Running envsubst unrestricted here previously blanked out nginx's own
+      # runtime variables ($host, $scheme, etc.), corrupting the config.
+      - ./nginx/conf.d/app-internal.conf.template:/etc/nginx/conf.d/app.conf:ro
     depends_on:
+      - web
       - api
-    command: npm run dev:web
-
-  # ============================================
-  # MAIL CATCHER (Dev only — catches all outgoing email)
-  # Web UI: http://localhost:8025
-  # ============================================
-  mailpit:
-    image: axllent/mailpit:latest
-    container_name: hotel-mailpit
-    restart: unless-stopped
-    ports:
-      - "1025:1025"   # SMTP
-      - "8025:8025"   # Web UI
-    environment:
-      MP_MAX_MESSAGES: 500
-      MP_SMTP_AUTH_ACCEPT_ANY: 1
-      MP_SMTP_AUTH_ALLOW_INSECURE: 1
-
-  # ============================================
-  # DATABASE ADMIN (Optional)
-  # ============================================
-  adminer:
-    image: adminer:latest
-    container_name: hotel-adminer
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    depends_on:
-      - postgres
-    profiles:
-      - tools
 
 volumes:
-  postgres_data:
   redis_data:
-
-networks:
-  default:
-    name: hotel-network
+  uploads_data:
