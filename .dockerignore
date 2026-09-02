@@ -1,52 +1,27 @@
-# Dependencies
+# This file matters only if a build ever uses the repo root as context.
+# backend/ and frontend/ each have their own .dockerignore for their builds.
+
 node_modules
-.pnp
-.pnp.js
-
-# Build outputs
-dist
+**/node_modules
 .next
-out
+**/.next
+dist
 build
-
-# Testing
 coverage
 
-# Misc
-.DS_Store
-*.pem
-.idea
-.vscode
-
-# Debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Local env files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Turbo
-.turbo
-
-# Docker
-*.tar
-*.tar.gz
-
-# Git
 .git
 .gitignore
-
-# Documentation
 *.md
 !README.md
 
-# Tests
-**/*.test.ts
-**/*.spec.ts
-**/__tests__
-jest.config.*
+.env
+.env.local
+.env.production
+**/.env
+**/.env.local
+**/.env.production
+
+certbot/
+.vscode
+.idea
+*.log

@@ -1,0 +1,14 @@
+node_modules
+.next
+npm-debug.log*
+
+# Local env files — build args are passed explicitly via docker-compose
+.env.local
+.env.local.example
+
+# Misc
+*.md
+.git
+.gitignore
+.vscode
+.idea

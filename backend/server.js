@@ -21,6 +21,12 @@ validateEnv();
 
 const app = express();
 
+// ── Trust the Nginx reverse proxy in front of this container ────────────────
+// Required so express-rate-limit and req.ip use the real client IP from
+// X-Forwarded-For instead of the proxy's IP, and so `secure` cookies/redirects
+// behave correctly behind TLS-terminating Nginx.
+app.set('trust proxy', 1);
+
 // ── Security & Utility Middleware ────────────────────────────────────────────
 app.use(
   helmet({

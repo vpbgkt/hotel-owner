@@ -1,0 +1,22 @@
+node_modules
+npm-debug.log*
+
+# Local env files — provided via docker-compose env_file instead
+.env
+.env.*
+!.env.example
+
+# Dev-only SQLite storage
+data/*.sqlite
+data/*.db
+
+# Uploaded files are runtime data, not build input
+uploads/*
+!uploads/.gitkeep
+
+# Misc
+*.md
+.git
+.gitignore
+.vscode
+.idea
