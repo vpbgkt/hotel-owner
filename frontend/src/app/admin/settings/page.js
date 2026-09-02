@@ -494,15 +494,12 @@ export default function AdminSettingsPage() {
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="label">Image URL (optional)</label>
-                    <input
-                      className="input text-sm"
-                      placeholder="https://... or /uploads/..."
-                      value={place.image || ''}
-                      onChange={(e) => { const n = [...nearbyPlaces]; n[i] = { ...n[i], image: e.target.value }; setNearbyPlaces(n); }}
-                    />
-                  </div>
+                  <ImageUploadField
+                    label="Place Image (optional)"
+                    value={place.image || ''}
+                    onChange={(url) => { const n = [...nearbyPlaces]; n[i] = { ...n[i], image: url }; setNearbyPlaces(n); }}
+                    hint="Recommended: landscape image. Uploaded or pasted URL."
+                  />
                 </div>
               ))}
             </div>
