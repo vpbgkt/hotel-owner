@@ -43,14 +43,14 @@ export default function LoginPage() {
   return (
     <AuthCard title="Sign In" subtitle="Welcome back to your account">
       {/* Mode Toggle */}
-      <div className="flex rounded-full bg-gray-100 p-1 mb-6">
+      {/* <div className="flex rounded-full bg-gray-100 p-1 mb-6">
         <button type="button" onClick={() => setMode('email')} className={`flex-1 py-2 text-sm rounded-full font-medium transition-colors ${mode === 'email' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>
           Email
         </button>
         <button type="button" onClick={() => setMode('phone')} className={`flex-1 py-2 text-sm rounded-full font-medium transition-colors ${mode === 'phone' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>
           Phone / OTP
         </button>
-      </div>
+      </div> */}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {mode === 'email' ? (
@@ -103,17 +103,6 @@ export default function LoginPage() {
         Don&apos;t have an account?{' '}
         <Link href="/auth/register" className="text-primary-600 hover:underline font-medium">Create account</Link>
       </p>
-
-      {/* Demo Credentials
-      // <div className="mt-6 p-4 bg-primary-50 rounded-xl border border-primary-100 text-sm">
-      //   <p className="font-semibold text-gray-900 mb-2 flex items-center gap-1.5">
-      //     <KeyRound className="w-3.5 h-3.5 text-primary-600" /> Demo Credentials
-      //   </p>
-      //   <div className="space-y-1.5 text-gray-700">
-      //     <p><span className="font-medium">Admin:</span> admin@grandhorizon.com / Admin@123</p>
-      //     <p><span className="font-medium">Guest:</span> guest@example.com / Guest@123</p>
-      //   </div>
-      // </div> */}
     </AuthCard>
   );
 }

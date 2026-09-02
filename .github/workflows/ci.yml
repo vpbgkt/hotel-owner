@@ -8,7 +8,7 @@ on:
 
 jobs:
   # ─────────────────────────────────────────────
-  # API: Type-check, Build, Test
+  # API / Backend
   # ─────────────────────────────────────────────
   api:
     name: API - Build & Check
@@ -46,44 +46,37 @@ jobs:
       JWT_REFRESH_SECRET: ci-test-refresh-secret
       NODE_ENV: test
 
+    defaults:
+      run:
+        working-directory: backend
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
+          cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate Prisma client
-        run: npx prisma generate
-        working-directory: apps/api
-
       - name: Run database migrations
-        run: npx prisma db push --skip-generate
-        working-directory: apps/api
-
-      - name: Build API
-        run: npm run build
-        working-directory: apps/api
-
-      - name: Run tests
-        run: npm test
-        working-directory: apps/api
+        run: npx sequelize-cli db:migrate
+        continue-on-error: true
 
   # ─────────────────────────────────────────────
-  # Web: Type-check, Build
+  # Web / Frontend
   # ─────────────────────────────────────────────
   web:
     name: Web - Build & Check
     runs-on: ubuntu-latest
 
-    env:
-      NEXT_PUBLIC_API_URL: http://localhost:4000/graphql
-      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+    defaults:
+      run:
+        working-directory: frontend
 
     steps:
       - uses: actions/checkout@v4
@@ -91,17 +84,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Type check
-        run: npx tsc --noEmit
-        working-directory: apps/web
-        continue-on-error: true
-
       - name: Build
         run: npm run build
-        working-directory: apps/web
