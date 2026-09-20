@@ -1,0 +1,24 @@
+name: Deploy Hotel Owner to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: hotel-prod          # matches --labels from Step 1
+
+    steps:
+      - name: Pull latest code
+        run: |
+          cd /home/deploy/apps/hotel-owner
+          git pull origin main
+
+      - name: Rebuild and restart containers
+        run: |
+          cd /home/deploy/apps/hotel-owner
+          docker compose up -d --build
+
+      - name: Cleanup old images
+        run: docker system prune -f
