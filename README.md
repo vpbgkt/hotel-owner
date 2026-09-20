@@ -2,7 +2,7 @@
 
 A full-stack, production-grade hotel reservation system built for **single hotel owners**. Features a direct booking website, fully-featured admin dashboard, offline/walk-in counter booking, guest management, inventory calendar, dynamic branding, daily + hourly room bookings, Razorpay payments, and lightweight deployment (runs on a ₹300/month VPS).
 
--------------------
+-------------------------
 
 ## Features
 
